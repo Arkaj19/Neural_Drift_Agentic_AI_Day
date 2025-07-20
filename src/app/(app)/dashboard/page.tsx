@@ -28,15 +28,16 @@ import {
   Phone,
   User,
 } from "lucide-react";
-import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 
-const metricIcons = {
-  "Total Crowd": Users,
-  "Active Guards": ShieldAlert,
-  "Active Alerts": Signal,
-  "System Status": Signal,
+const metricIcons: { [key: string]: React.ElementType } = {
+    "Total Crowd": Users,
+    "Active Guards": ShieldAlert,
+    "Active Alerts": Signal,
+    "System Status": Signal,
 };
+
 
 const getStatusBadgeVariant = (status: "Active" | "Alert" | "Standby") => {
   switch (status) {
@@ -62,13 +63,20 @@ export default function DashboardPage() {
       setGuards(guardsData);
       
       // Update active guards count in metrics
-      setMetrics(prevMetrics => ({
-        ...prevMetrics,
-        "Active Guards": {
-            ...prevMetrics["Active Guards"],
-            value: guardsData.filter(g => g.status === 'Active').length.toString(),
+      setMetrics(prevMetrics => {
+        const activeGuardsCount = guardsData.filter(g => g.status === 'Active').length;
+        const currentActiveGuards = parseInt(prevMetrics["Active Guards"].value) || 0;
+        const changeType = activeGuardsCount > currentActiveGuards ? 'increase' : activeGuardsCount < currentActiveGuards ? 'decrease' : 'neutral';
+        return {
+          ...prevMetrics,
+          "Active Guards": {
+              ...prevMetrics["Active Guards"],
+              value: activeGuardsCount.toString(),
+              change: `${changeType === 'increase' ? '+' : ''}${activeGuardsCount - currentActiveGuards}`,
+              changeType: changeType
+          }
         }
-      }));
+      });
     });
 
     // Fetch total crowd data
@@ -76,14 +84,21 @@ export default function DashboardPage() {
     const crowdUnsubscribe = onSnapshot(crowdDocRef, (doc) => {
         if (doc.exists()) {
             const crowdData = doc.data();
-            setMetrics(prevMetrics => ({
-                ...prevMetrics,
-                "Total Crowd": {
-                    ...prevMetrics["Total Crowd"],
-                    value: crowdData.count.toLocaleString(),
-                    change: prevMetrics["Total Crowd"].value !== crowdData.count.toLocaleString() ? (parseInt(prevMetrics["Total Crowd"].value.replace(/,/g, '')) < crowdData.count ? '+1' : '-1') : '+0%', // simplistic change detection
-                }
-            }));
+            setMetrics(prevMetrics => {
+              const currentCrowd = parseInt(prevMetrics["Total Crowd"].value.replace(/,/g, '')) || 0;
+              const newCrowd = crowdData.count;
+              const changeType = newCrowd > currentCrowd ? 'increase' : newCrowd < currentCrowd ? 'decrease' : 'neutral';
+
+              return {
+                  ...prevMetrics,
+                  "Total Crowd": {
+                      ...prevMetrics["Total Crowd"],
+                      value: newCrowd.toLocaleString(),
+                      change: `${newCrowd - currentCrowd >= 0 ? '+' : ''}${(newCrowd - currentCrowd).toLocaleString()}`,
+                      changeType: changeType
+                  }
+              }
+            });
         }
     });
 
@@ -98,7 +113,7 @@ export default function DashboardPage() {
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Object.entries(metrics).map(([title, data]) => {
-          const Icon = metricIcons[title as keyof typeof metricIcons];
+          const Icon = metricIcons[title];
           if (!Icon) {
             return null; // Or a placeholder/error component
           }
@@ -115,7 +130,7 @@ export default function DashboardPage() {
                     "text-xs text-muted-foreground flex items-center",
                     {
                       "text-green-400": data.changeType === "increase",
-                      "text-red-400": title === "Active Alerts" && data.changeType === "increase",
+                      "text-red-400": data.changeType === "decrease" || (title === "Active Alerts" && data.changeType === "increase"),
                     }
                   )}
                 >
