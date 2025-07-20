@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -16,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { keyMetrics, type Guard } from "@/lib/data";
+import { keyMetrics, type Guard, sectors as sectorOptions } from "@/lib/data";
 import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import {
@@ -27,9 +28,30 @@ import {
   Signal,
   Phone,
   User,
+  PlusCircle,
 } from "lucide-react";
-import { collection, onSnapshot, doc } from "firebase/firestore";
+import { collection, onSnapshot, doc, addDoc, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+
 
 const metricIcons: { [key: string]: React.ElementType } = {
     "Total Crowd": Users,
@@ -37,7 +59,6 @@ const metricIcons: { [key: string]: React.ElementType } = {
     "Active Alerts": Signal,
     "System Status": Signal,
 };
-
 
 const getStatusBadgeVariant = (status: "Active" | "Alert" | "Standby") => {
   switch (status) {
@@ -52,9 +73,98 @@ const getStatusBadgeVariant = (status: "Active" | "Alert" | "Standby") => {
   }
 };
 
+function AddGuardForm({ onGuardAdded }: { onGuardAdded: () => void }) {
+  const [name, setName] = useState("");
+  const [sector, setSector] = useState("");
+  const [status, setStatus] = useState<Guard["status"]>("Standby");
+  const [phone, setPhone] = useState("");
+  const { toast } = useToast();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !phone) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill out all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await addDoc(collection(db, "guards"), {
+        name,
+        sector,
+        status,
+        phone,
+      });
+      toast({
+        title: "Guard Added",
+        description: `${name} has been added to the roster.`,
+      });
+      onGuardAdded(); // Close dialog
+      // Reset form
+      setName("");
+      setSector("");
+      setStatus("Standby");
+      setPhone("");
+    } catch (error) {
+      console.error("Error adding guard: ", error);
+      toast({
+        title: "Error",
+        description: "Could not add guard. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="name">Guard Name</Label>
+        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" required />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="phone">Phone Number</Label>
+        <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="123-456-7890" required />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="sector">Sector</Label>
+          <Select value={sector} onValueChange={setSector}>
+            <SelectTrigger id="sector">
+              <SelectValue placeholder="Select a sector" />
+            </SelectTrigger>
+            <SelectContent>
+              {sectorOptions.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="status">Status</Label>
+          <Select value={status} onValueChange={(v) => setStatus(v as Guard['status'])}>
+            <SelectTrigger id="status">
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Active">Active</SelectItem>
+              <SelectItem value="Standby">Standby</SelectItem>
+              <SelectItem value="Alert">Alert</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button type="submit">Add Guard</Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
 export default function DashboardPage() {
   const [guards, setGuards] = useState<Guard[]>([]);
   const [metrics, setMetrics] = useState(keyMetrics);
+  const [isAddGuardOpen, setAddGuardOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Fetch guards data
@@ -108,6 +218,24 @@ export default function DashboardPage() {
     };
   }, []);
 
+  const handleGuardUpdate = async (guardId: string, field: keyof Guard, value: string) => {
+    const guardRef = doc(db, "guards", guardId);
+    try {
+      await updateDoc(guardRef, { [field]: value });
+      toast({
+        title: "Guard Updated",
+        description: `Guard's ${field} has been updated.`,
+      });
+    } catch (error) {
+      console.error("Error updating guard: ", error);
+      toast({
+        title: "Error",
+        description: "Could not update guard. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   return (
     <div className="space-y-4">
@@ -147,8 +275,28 @@ export default function DashboardPage() {
         })}
       </div>
       <Card>
-        <CardHeader>
-          <CardTitle>Guard Status</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+                <CardTitle>Guard Status</CardTitle>
+                <CardDescription>Manage your security team in real-time.</CardDescription>
+            </div>
+            <Dialog open={isAddGuardOpen} onOpenChange={setAddGuardOpen}>
+            <DialogTrigger asChild>
+                <Button>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                New Guard
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                <DialogTitle>Add New Guard</DialogTitle>
+                <DialogDescription>
+                    Enter the details for the new guard. Click save when you're done.
+                </DialogDescription>
+                </DialogHeader>
+                <AddGuardForm onGuardAdded={() => setAddGuardOpen(false)} />
+            </DialogContent>
+            </Dialog>
         </CardHeader>
         <CardContent>
           <Table>
@@ -156,7 +304,6 @@ export default function DashboardPage() {
               <TableRow>
                 <TableHead>Guard</TableHead>
                 <TableHead>Sector</TableHead>
-                <TableHead>Location</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -174,18 +321,40 @@ export default function DashboardPage() {
                       <span className="font-medium">{guard.name}</span>
                     </div>
                   </TableCell>
-                  <TableCell>{guard.sector}</TableCell>
-                  <TableCell>{guard.location}</TableCell>
                   <TableCell>
-                    <Badge variant={getStatusBadgeVariant(guard.status)}>
-                      {guard.status}
-                    </Badge>
+                    <Select value={guard.sector} onValueChange={(value) => handleGuardUpdate(guard.id, 'sector', value)}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Select Sector" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {sectorOptions.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm">
-                      <Phone className="h-4 w-4 mr-2" />
-                      Contact
-                    </Button>
+                    <Select value={guard.status} onValueChange={(value) => handleGuardUpdate(guard.id, 'status', value as Guard['status'])}>
+                        <SelectTrigger className="w-[120px]">
+                            <SelectValue asChild>
+                                <Badge variant={getStatusBadgeVariant(guard.status)} className="capitalize">{guard.status}</Badge>
+                            </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Active"><Badge variant="default">Active</Badge></SelectItem>
+                            <SelectItem value="Standby"><Badge variant="secondary">Standby</Badge></SelectItem>
+                            <SelectItem value="Alert"><Badge variant="destructive">Alert</Badge></SelectItem>
+                        </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">{guard.phone}</span>
+                        <Button variant="outline" size="sm" asChild>
+                           <a href={`tel:${guard.phone}`}>
+                                <Phone className="h-4 w-4 mr-2" />
+                                Contact
+                            </a>
+                        </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

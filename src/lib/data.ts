@@ -5,13 +5,12 @@ export const keyMetrics = {
     "System Status": { value: '98%', change: '+2.1%', changeType: 'increase' as const },
 };
 
-// This will now be fetched from Firestore
 export type Guard = {
     id: string;
     name: string;
     sector: string;
-    location: string;
     status: 'Active' | 'Alert' | 'Standby';
+    phone: string;
 };
 
 export const alerts = [
@@ -30,9 +29,9 @@ export const cameras = [
 ];
 
 export const sectors = [
-    { name: 'Main Stage', capacity: 85, status: 'normal' as const },
+    { name: 'Main Gate', capacity: 85, status: 'normal' as const },
     { name: 'Food Court', capacity: 95, status: 'alert' as const },
-    { name: 'Entrance Gate', capacity: 70, status: 'normal' as const },
+    { name: 'Concert Stage', capacity: 70, status: 'normal' as const },
     { name: 'VIP Area', capacity: 60, status: 'normal' as const },
     { name: 'Parking Area', capacity: 45, status: 'normal' as const },
     { name: 'Emergency Exit', capacity: 30, status: 'alert' as const },
