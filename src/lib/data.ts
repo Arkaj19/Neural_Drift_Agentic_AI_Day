@@ -1,18 +1,18 @@
 export const keyMetrics = {
-    "Total Crowd": { value: '12,847', change: '+5.2%', changeType: 'increase' as const },
-    "Active Guards": { value: '24', change: '0%', changeType: 'neutral' as const },
+    "Total Crowd": { value: '0', change: '+0%', changeType: 'neutral' as const }, // This will be updated from Firestore
+    "Active Guards": { value: '0', change: '0%', changeType: 'neutral' as const }, // This will be updated from Firestore
     "Active Alerts": { value: '3', change: '+25%', changeType: 'increase' as const },
     "System Status": { value: '98%', change: '+2.1%', changeType: 'increase' as const },
 };
 
-export const guards = [
-    { name: 'Yashpal Rana', sector: 'A', location: 'Main Gate', status: 'Active' as const, avatar: '/avatars/01.png' },
-    { name: 'Mahesh Shetty', sector: 'B', location: 'Food Court', status: 'Alert' as const, avatar: '/avatars/02.png' },
-    { name: 'Harjit Dhillon', sector: 'C', location: 'Concert Stage', status: 'Active' as const, avatar: '/avatars/03.png' },
-    { name: 'Devika Pillai', sector: 'D', location: 'Parking Area', status: 'Standby' as const, avatar: '/avatars/04.png' },
-    { name: 'Rajesh Kumar', sector: 'E', location: 'VIP Area', status: 'Active' as const, avatar: '/avatars/05.png' },
-    { name: 'Meera Chauhan', sector: 'F', location: 'Emergency Exit', status: 'Active' as const, avatar: '/avatars/06.png' },
-];
+// This will now be fetched from Firestore
+export type Guard = {
+    id: string;
+    name: string;
+    sector: string;
+    location: string;
+    status: 'Active' | 'Alert' | 'Standby';
+};
 
 export const alerts = [
     { type: 'Violence', location: 'Sector B - Food Court', time: '2 min ago', priority: 'High' as const },

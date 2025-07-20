@@ -1,4 +1,5 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+'use client';
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +16,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { guards, keyMetrics } from "@/lib/data";
+import { keyMetrics, type Guard } from "@/lib/data";
+import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import {
   ArrowUp,
@@ -24,7 +26,10 @@ import {
   ShieldAlert,
   Signal,
   Phone,
+  User,
 } from "lucide-react";
+import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
 
 const metricIcons = {
   "Total Crowd": Users,
@@ -47,10 +52,52 @@ const getStatusBadgeVariant = (status: "Active" | "Alert" | "Standby") => {
 };
 
 export default function DashboardPage() {
+  const [guards, setGuards] = useState<Guard[]>([]);
+  const [metrics, setMetrics] = useState(keyMetrics);
+
+  useEffect(() => {
+    // Fetch guards data
+    const guardsUnsubscribe = onSnapshot(collection(db, "guards"), (snapshot) => {
+      const guardsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Guard));
+      setGuards(guardsData);
+      
+      // Update active guards count in metrics
+      setMetrics(prevMetrics => ({
+        ...prevMetrics,
+        "Active Guards": {
+            ...prevMetrics["Active Guards"],
+            value: guardsData.filter(g => g.status === 'Active').length.toString(),
+        }
+      }));
+    });
+
+    // Fetch total crowd data
+    const crowdDocRef = doc(db, "crowdData", "total");
+    const crowdUnsubscribe = onSnapshot(crowdDocRef, (doc) => {
+        if (doc.exists()) {
+            const crowdData = doc.data();
+            setMetrics(prevMetrics => ({
+                ...prevMetrics,
+                "Total Crowd": {
+                    ...prevMetrics["Total Crowd"],
+                    value: crowdData.count.toLocaleString(),
+                    change: prevMetrics["Total Crowd"].value !== crowdData.count.toLocaleString() ? (parseInt(prevMetrics["Total Crowd"].value.replace(/,/g, '')) < crowdData.count ? '+1' : '-1') : '+0%', // simplistic change detection
+                }
+            }));
+        }
+    });
+
+    return () => {
+      guardsUnsubscribe();
+      crowdUnsubscribe();
+    };
+  }, []);
+
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {Object.entries(keyMetrics).map(([title, data]) => {
+        {Object.entries(metrics).map(([title, data]) => {
           const Icon = metricIcons[title as keyof typeof metricIcons];
           if (!Icon) {
             return null; // Or a placeholder/error component
@@ -101,12 +148,13 @@ export default function DashboardPage() {
             </TableHeader>
             <TableBody>
               {guards.map((guard) => (
-                <TableRow key={guard.name}>
+                <TableRow key={guard.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Avatar>
-                        <AvatarImage src={`https://i.pravatar.cc/40?u=${guard.name}`} />
-                        <AvatarFallback>{guard.name.charAt(0)}</AvatarFallback>
+                        <AvatarFallback>
+                            <User className="h-5 w-5" />
+                        </AvatarFallback>
                       </Avatar>
                       <span className="font-medium">{guard.name}</span>
                     </div>
