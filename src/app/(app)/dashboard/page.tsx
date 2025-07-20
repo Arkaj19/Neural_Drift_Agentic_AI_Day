@@ -52,6 +52,9 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Object.entries(keyMetrics).map(([title, data]) => {
           const Icon = metricIcons[title as keyof typeof metricIcons];
+          if (!Icon) {
+            return null; // Or a placeholder/error component
+          }
           return (
             <Card key={title}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

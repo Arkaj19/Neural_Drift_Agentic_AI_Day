@@ -1,8 +1,8 @@
 export const keyMetrics = {
-    totalCrowd: { value: '12,847', change: '+5.2%', changeType: 'increase' as const },
-    activeGuards: { value: '24', change: '0%', changeType: 'neutral' as const },
-    activeAlerts: { value: '3', change: '+25%', changeType: 'increase' as const },
-    systemStatus: { value: '98%', change: '+2.1%', changeType: 'increase' as const },
+    "Total Crowd": { value: '12,847', change: '+5.2%', changeType: 'increase' as const },
+    "Active Guards": { value: '24', change: '0%', changeType: 'neutral' as const },
+    "Active Alerts": { value: '3', change: '+25%', changeType: 'increase' as const },
+    "System Status": { value: '98%', change: '+2.1%', changeType: 'increase' as const },
 };
 
 export const guards = [
