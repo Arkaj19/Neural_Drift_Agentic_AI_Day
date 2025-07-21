@@ -1,0 +1,20 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Allow read and write access to the 'guards' collection for all users.
+    // In a production app, you would likely want to restrict this to authenticated users or specific roles.
+    match /guards/{guardId} {
+      allow read, write: if true;
+    }
+
+    // Allow read access to the 'crowdData' collection for all users.
+    // In a production app, you might have a backend service write to this collection
+    // and only allow clients to read.
+    match /crowdData/{docId} {
+      allow read: if true;
+      allow write: if true; // Allowing client write for demo purposes
+    }
+  }
+}

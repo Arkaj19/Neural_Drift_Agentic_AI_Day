@@ -175,12 +175,16 @@ export default function DashboardPage() {
       // Update active guards count in metrics
       setMetrics(prevMetrics => {
         const activeGuardsCount = guardsData.filter(g => g.status === 'Active').length;
-        const currentActiveGuards = parseInt(prevMetrics["Active Guards"].value) || 0;
+        const currentActiveGuardsMetric = prevMetrics["Active Guards"];
+        if (!currentActiveGuardsMetric) return prevMetrics;
+
+        const currentActiveGuards = parseInt(currentActiveGuardsMetric.value) || 0;
         const changeType = activeGuardsCount > currentActiveGuards ? 'increase' : activeGuardsCount < currentActiveGuards ? 'decrease' : 'neutral';
+        
         return {
           ...prevMetrics,
           "Active Guards": {
-              ...prevMetrics["Active Guards"],
+              ...currentActiveGuardsMetric,
               value: activeGuardsCount.toString(),
               change: `${changeType === 'increase' ? '+' : ''}${activeGuardsCount - currentActiveGuards}`,
               changeType: changeType
@@ -195,14 +199,17 @@ export default function DashboardPage() {
         if (doc.exists()) {
             const crowdData = doc.data();
             setMetrics(prevMetrics => {
-              const currentCrowd = parseInt(prevMetrics["Total Crowd"].value.replace(/,/g, '')) || 0;
+              const totalCrowdMetric = prevMetrics["Total Crowd"];
+              if(!totalCrowdMetric) return prevMetrics;
+
+              const currentCrowd = parseInt(totalCrowdMetric.value.replace(/,/g, '')) || 0;
               const newCrowd = crowdData.count;
               const changeType = newCrowd > currentCrowd ? 'increase' : newCrowd < currentCrowd ? 'decrease' : 'neutral';
 
               return {
                   ...prevMetrics,
                   "Total Crowd": {
-                      ...prevMetrics["Total Crowd"],
+                      ...totalCrowdMetric,
                       value: newCrowd.toLocaleString(),
                       change: `${newCrowd - currentCrowd >= 0 ? '+' : ''}${(newCrowd - currentCrowd).toLocaleString()}`,
                       changeType: changeType
@@ -243,7 +250,7 @@ export default function DashboardPage() {
         {Object.entries(metrics).map(([title, data]) => {
           const Icon = metricIcons[title];
           if (!Icon) {
-            return null; // Or a placeholder/error component
+            return null;
           }
           return (
             <Card key={title}>
@@ -292,7 +299,7 @@ export default function DashboardPage() {
                 <DialogTitle>Add New Guard</DialogTitle>
                 <DialogDescription>
                     Enter the details for the new guard. Click save when you're done.
-                </DialogDescription>
+                </Description>
                 </DialogHeader>
                 <AddGuardForm onGuardAdded={() => setAddGuardOpen(false)} />
             </DialogContent>
