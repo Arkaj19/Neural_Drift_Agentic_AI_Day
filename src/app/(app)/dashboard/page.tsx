@@ -107,11 +107,11 @@ function AddGuardForm({ onGuardAdded }: { onGuardAdded: () => void }) {
       setSector("");
       setStatus("Standby");
       setPhone("");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding guard: ", error);
       toast({
-        title: "Error",
-        description: "Could not add guard. Please try again.",
+        title: "Error adding guard",
+        description: error.message || "Could not add guard. Please check console and Firebase rules.",
         variant: "destructive",
       });
     }
@@ -233,11 +233,11 @@ export default function DashboardPage() {
         title: "Guard Updated",
         description: `Guard's ${field} has been updated.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating guard: ", error);
       toast({
         title: "Error",
-        description: "Could not update guard. Please try again.",
+        description: error.message || "Could not update guard. Please try again.",
         variant: "destructive",
       });
     }
