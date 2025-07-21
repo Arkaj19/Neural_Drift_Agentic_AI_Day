@@ -299,7 +299,7 @@ export default function DashboardPage() {
                 <DialogTitle>Add New Guard</DialogTitle>
                 <DialogDescription>
                     Enter the details for the new guard. Click save when you're done.
-                </Description>
+                </DialogDescription>
                 </DialogHeader>
                 <AddGuardForm onGuardAdded={() => setAddGuardOpen(false)} />
             </DialogContent>
