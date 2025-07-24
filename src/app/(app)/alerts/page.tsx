@@ -88,7 +88,7 @@ export default function AlertsPage() {
   const fetchAlerts = async () => {
     try {
       setError(null);
-      const response = await fetch('/api/alerts');
+      const response = await fetch('http://localhost:5000/api/alerts');
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
