@@ -87,6 +87,7 @@ export default function AlertsPage() {
 
   const fetchAlerts = async () => {
     try {
+      setLoading(true);
       setError(null);
       const response = await fetch('http://localhost:5000/api/alerts');
       
@@ -267,7 +268,7 @@ export default function AlertsPage() {
                         {details.type} - {alert.feed_name}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {alert.area} • Count: {alert.current_count} • Density: {alert.density_percentage}%
+                        {alert.area} • Density: {alert.density_percentage}%
                       </p>
                     </div>
                   </div>
