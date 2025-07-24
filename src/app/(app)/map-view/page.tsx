@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
@@ -43,65 +44,6 @@ interface FeedsResponse {
   total_count: number;
   timestamp: string;
 }
-
-// Mock data for development - replace with actual API data
-const mockFeeds: Record<string, FeedLocation> = {
-  feed_1: {
-    feed_id: "feed_1",
-    name: "Main Entrance",
-    current_count: 45,
-    max_capacity: 50,
-    density_percentage: 90,
-    alert_level: "critical",
-    last_updated: new Date().toISOString(),
-    location: { lat: 28.6139, lng: 77.2090 },
-    area: "entrance"
-  },
-  feed_2: {
-    feed_id: "feed_2", 
-    name: "Mall Stage",
-    current_count: 76,
-    max_capacity: 100,
-    density_percentage: 76,
-    alert_level: "warning",
-    last_updated: new Date().toISOString(),
-    location: { lat: 28.6140, lng: 77.2091 },
-    area: "stage"
-  },
-  feed_3: {
-    feed_id: "feed_3",
-    name: "Red Street Road", 
-    current_count: 18,
-    max_capacity: 30,
-    density_percentage: 60,
-    alert_level: "normal",
-    last_updated: new Date().toISOString(),
-    location: { lat: 28.6141, lng: 77.2092 },
-    area: "food_court"
-  },
-  feed_4: {
-    feed_id: "feed_4",
-    name: "Exit Gate",
-    current_count: 12,
-    max_capacity: 25, 
-    density_percentage: 48,
-    alert_level: "normal",
-    last_updated: new Date().toISOString(),
-    location: { lat: 28.6142, lng: 77.2093 },
-    area: "exit_a"
-  },
-  feed_5: {
-    feed_id: "feed_5",
-    name: "Subway",
-    current_count: 20,
-    max_capacity: 25,
-    density_percentage: 80,
-    alert_level: "warning", 
-    last_updated: new Date().toISOString(),
-    location: { lat: 28.6143, lng: 77.2094 },
-    area: "exit_b"
-  }
-};
 
 const alertLevelConfig = {
   critical: {
@@ -302,12 +244,12 @@ export default function MapViewPage() {
   const fetchFeeds = async () => {
     try {
       setError(null);
+      setLoading(true);
       
-      // Try to fetch from API first
       const response = await fetch('/api/feeds');
       
       if (!response.ok) {
-        throw new Error(`API unavailable (${response.status})`);
+        throw new Error(`API error: ${response.status}`);
       }
       
       const data: FeedsResponse = await response.json();
@@ -316,12 +258,8 @@ export default function MapViewPage() {
       setIsOnline(true);
       
     } catch (err) {
-      console.warn('API not available, using mock data:', err);
-      
-      // Fallback to mock data
-      setFeeds(mockFeeds);
-      setLastUpdated(new Date().toISOString());
-      setError('Using offline data - API not available');
+      console.error('API call failed, will not use mock data:', err);
+      setError(err instanceof Error ? err.message : 'API not available');
       setIsOnline(false);
       
     } finally {
@@ -336,7 +274,6 @@ export default function MapViewPage() {
   }, []);
 
   const handleRefresh = () => {
-    setLoading(true);
     fetchFeeds();
   };
 
@@ -353,6 +290,7 @@ export default function MapViewPage() {
   }, {} as Record<string, typeof feedsArray>);
 
   const formatTimestamp = (timestamp: string) => {
+    if(!timestamp) return 'N/A';
     const date = new Date(timestamp);
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
@@ -393,14 +331,14 @@ export default function MapViewPage() {
           </div>
         </div>
 
-        {error && !isOnline && (
+        {error && (
           <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
             <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
               <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm font-medium">Demo Mode</span>
+              <span className="text-sm font-medium">Connection Error</span>
             </div>
             <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-              API connection failed. Showing sample data for demonstration.
+              Could not connect to the data source: {error}
             </p>
           </div>
         )}
@@ -539,5 +477,3 @@ export default function MapViewPage() {
     </div>
   );
 }
-
-    
