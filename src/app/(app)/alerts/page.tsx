@@ -20,10 +20,10 @@ import {
   Clock
 } from "lucide-react";
 
-// Map API alert levels to your existing alert types
+// Map API alert levels to proper crowd monitoring alert types
 const alertLevelMapping = {
   critical: {
-    type: "Violence",
+    type: "Critical Crowding",
     priority: "High",
     icon: Zap,
     variant: "destructive" as const,
@@ -31,7 +31,7 @@ const alertLevelMapping = {
     badgeClass: "bg-red-500",
   },
   warning: {
-    type: "Crowding", 
+    type: "High Density", 
     priority: "Medium",
     icon: Users,
     variant: "default" as const,
@@ -39,13 +39,22 @@ const alertLevelMapping = {
     badgeClass: "bg-yellow-500 text-black",
   },
   normal: {
-    type: "Normal",
+    type: "Normal Traffic",
     priority: "Low", 
     icon: TrendingUp,
     variant: "secondary" as const,
     color: "bg-blue-900/20 border-blue-500",
     badgeClass: "bg-blue-500",
   },
+};
+
+// Map API feed areas to sector names for consistency with your UI
+const areaSectorMapping: Record<string, string> = {
+  "entrance": "Sector A",
+  "stage": "Sector B", 
+  "food_court": "Sector C",
+  "exit_a": "Sector D",
+  "exit_b": "Sector E"
 };
 
 interface ApiAlert {
