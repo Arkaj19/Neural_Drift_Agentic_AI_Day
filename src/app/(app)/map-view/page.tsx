@@ -18,7 +18,9 @@ import {
   AlertTriangle,
   Zap,
   TrendingUp,
-  Loader2
+  Loader2,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 
 interface FeedLocation {
@@ -41,6 +43,65 @@ interface FeedsResponse {
   total_count: number;
   timestamp: string;
 }
+
+// Mock data for development - replace with actual API data
+const mockFeeds: Record<string, FeedLocation> = {
+  feed_1: {
+    feed_id: "feed_1",
+    name: "Main Entrance",
+    current_count: 45,
+    max_capacity: 50,
+    density_percentage: 90,
+    alert_level: "critical",
+    last_updated: new Date().toISOString(),
+    location: { lat: 28.6139, lng: 77.2090 },
+    area: "entrance"
+  },
+  feed_2: {
+    feed_id: "feed_2", 
+    name: "Mall Stage",
+    current_count: 76,
+    max_capacity: 100,
+    density_percentage: 76,
+    alert_level: "warning",
+    last_updated: new Date().toISOString(),
+    location: { lat: 28.6140, lng: 77.2091 },
+    area: "stage"
+  },
+  feed_3: {
+    feed_id: "feed_3",
+    name: "Red Street Road", 
+    current_count: 18,
+    max_capacity: 30,
+    density_percentage: 60,
+    alert_level: "normal",
+    last_updated: new Date().toISOString(),
+    location: { lat: 28.6141, lng: 77.2092 },
+    area: "food_court"
+  },
+  feed_4: {
+    feed_id: "feed_4",
+    name: "Exit Gate",
+    current_count: 12,
+    max_capacity: 25, 
+    density_percentage: 48,
+    alert_level: "normal",
+    last_updated: new Date().toISOString(),
+    location: { lat: 28.6142, lng: 77.2093 },
+    area: "exit_a"
+  },
+  feed_5: {
+    feed_id: "feed_5",
+    name: "Subway",
+    current_count: 20,
+    max_capacity: 25,
+    density_percentage: 80,
+    alert_level: "warning", 
+    last_updated: new Date().toISOString(),
+    location: { lat: 28.6143, lng: 77.2094 },
+    area: "exit_b"
+  }
+};
 
 const alertLevelConfig = {
   critical: {
@@ -73,28 +134,196 @@ const getProgressColor = (capacity: number) => {
   return "bg-green-500";
 };
 
+// Interactive Map Component
+const InteractiveMap = ({ feeds, selectedFeed, onFeedSelect }: {
+  feeds: FeedLocation[];
+  selectedFeed: string | null;
+  onFeedSelect: (feedId: string | null) => void;
+}) => {
+  const [mapCenter, setMapCenter] = useState({ lat: 28.6141, lng: 77.2092 });
+  const [zoom, setZoom] = useState(16);
+
+  // Calculate map bounds
+  useEffect(() => {
+    if (feeds.length > 0) {
+      const lats = feeds.map(f => f.location.lat);
+      const lngs = feeds.map(f => f.location.lng);
+      
+      const centerLat = (Math.max(...lats) + Math.min(...lats)) / 2;
+      const centerLng = (Math.max(...lngs) + Math.min(...lngs)) / 2;
+      
+      setMapCenter({ lat: centerLat, lng: centerLng });
+    }
+  }, [feeds]);
+
+  return (
+    <div className="aspect-video w-full bg-slate-100 dark:bg-slate-800 rounded-lg relative overflow-hidden">
+      {/* OpenStreetMap-style background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-green-50 via-blue-50 to-yellow-50 dark:from-slate-700 dark:to-slate-600">
+        
+        {/* Map Grid */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="w-full h-full grid grid-cols-12 grid-rows-8 border border-slate-400">
+            {Array.from({length: 96}).map((_, i) => (
+              <div key={i} className="border border-slate-300"></div>
+            ))}
+          </div>
+        </div>
+
+        {/* Streets simulation */}
+        <div className="absolute inset-0">
+          <div className="absolute top-1/3 left-0 right-0 h-2 bg-gray-300 dark:bg-gray-600 opacity-60"></div>
+          <div className="absolute bottom-1/3 left-0 right-0 h-2 bg-gray-300 dark:bg-gray-600 opacity-60"></div>
+          <div className="absolute top-0 bottom-0 left-1/4 w-2 bg-gray-300 dark:bg-gray-600 opacity-60"></div>
+          <div className="absolute top-0 bottom-0 right-1/4 w-2 bg-gray-300 dark:bg-gray-600 opacity-60"></div>
+        </div>
+
+        {/* Feed Location Markers */}
+        <div className="absolute inset-4">
+          {feeds.map((feed, index) => {
+            const alertConfig = alertLevelConfig[feed.alert_level];
+            
+            // Convert lat/lng to pixel position (simplified projection)
+            const relativeX = ((feed.location.lng - mapCenter.lng) * 100000) + 50;
+            const relativeY = 50 - ((feed.location.lat - mapCenter.lat) * 100000);
+            
+            // Ensure markers stay within bounds
+            const x = Math.max(5, Math.min(95, relativeX));
+            const y = Math.max(5, Math.min(95, relativeY));
+            
+            return (
+              <div
+                key={feed.feed_id}
+                className={cn(
+                  "absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-300",
+                  selectedFeed === feed.feed_id ? "scale-125 z-20" : "hover:scale-110 z-10"
+                )}
+                style={{ left: `${x}%`, top: `${y}%` }}
+                onClick={() => onFeedSelect(selectedFeed === feed.feed_id ? null : feed.feed_id)}
+              >
+                {/* Marker */}
+                <div className={cn("relative p-3 rounded-full shadow-lg border-2 border-white", alertConfig.color)}>
+                  <MapPin className="h-6 w-6 text-white" />
+                  
+                  {/* Critical alert animation */}
+                  {feed.alert_level === 'critical' && (
+                    <>
+                      <div className="absolute -top-1 -right-1 h-4 w-4 bg-red-600 rounded-full animate-pulse">
+                        <div className="h-full w-full bg-red-400 rounded-full animate-ping"></div>
+                      </div>
+                      <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-25"></div>
+                    </>
+                  )}
+                  
+                  {/* Count badge */}
+                  <div className="absolute -bottom-2 -right-2 bg-white dark:bg-slate-800 text-xs font-bold px-2 py-1 rounded-full border shadow-sm">
+                    {feed.current_count}
+                  </div>
+                </div>
+                
+                {/* Info popup */}
+                {selectedFeed === feed.feed_id && (
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 bg-white dark:bg-slate-800 p-4 rounded-lg shadow-xl border min-w-64 z-30">
+                    <div className="text-center">
+                      <h4 className="font-semibold text-base mb-2">{feed.name}</h4>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="text-left">
+                          <p className="text-muted-foreground">Count</p>
+                          <p className="font-semibold">{feed.current_count}/{feed.max_capacity}</p>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-muted-foreground">Density</p>
+                          <p className="font-semibold">{feed.density_percentage}%</p>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-muted-foreground">Status</p>
+                          <Badge variant={
+                            feed.alert_level === 'critical' ? 'destructive' : 
+                            feed.alert_level === 'warning' ? 'default' : 'secondary'
+                          } className="text-xs">
+                            {alertConfig.label}
+                          </Badge>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-muted-foreground">Area</p>
+                          <p className="font-semibold capitalize">{feed.area.replace('_', ' ')}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-2 border-t text-xs text-muted-foreground">
+                        📍 {feed.location.lat.toFixed(4)}, {feed.location.lng.toFixed(4)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Map controls */}
+        <div className="absolute top-4 left-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-2 flex flex-col gap-1">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setZoom(Math.min(20, zoom + 1))}
+            className="h-8 w-8 p-0"
+          >
+            +
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setZoom(Math.max(10, zoom - 1))}
+            className="h-8 w-8 p-0"
+          >
+            -
+          </Button>
+        </div>
+
+        {/* Scale and coordinates */}
+        <div className="absolute bottom-2 right-2 text-xs text-muted-foreground bg-white/90 dark:bg-black/90 px-3 py-2 rounded-lg">
+          <div>Scale: 1:{Math.round(1000 / zoom * 100)}m</div>
+          <div>Center: {mapCenter.lat.toFixed(4)}, {mapCenter.lng.toFixed(4)}</div>
+          <div>Zoom: {zoom}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function MapViewPage() {
   const [feeds, setFeeds] = useState<Record<string, FeedLocation>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState('');
   const [selectedFeed, setSelectedFeed] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
 
   const fetchFeeds = async () => {
     try {
       setError(null);
+      
+      // Try to fetch from API first
       const response = await fetch('/api/feeds');
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`API unavailable (${response.status})`);
       }
       
       const data: FeedsResponse = await response.json();
       setFeeds(data.feeds);
       setLastUpdated(data.timestamp);
+      setIsOnline(true);
+      
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch feeds');
-      console.error('Error fetching feeds:', err);
+      console.warn('API not available, using mock data:', err);
+      
+      // Fallback to mock data
+      setFeeds(mockFeeds);
+      setLastUpdated(new Date().toISOString());
+      setError('Using offline data - API not available');
+      setIsOnline(false);
+      
     } finally {
       setLoading(false);
     }
@@ -102,7 +331,7 @@ export default function MapViewPage() {
 
   useEffect(() => {
     fetchFeeds();
-    const interval = setInterval(fetchFeeds, 15000); // Update every 15 seconds
+    const interval = setInterval(fetchFeeds, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -112,27 +341,9 @@ export default function MapViewPage() {
   };
 
   const feedsArray = Object.entries(feeds).map(([id, feed]) => ({
-    id,
-    ...feed
+    ...feed,
+    feed_id: id
   }));
-
-  // Calculate map bounds based on feed locations
-  const getMapBounds = () => {
-    if (feedsArray.length === 0) return { center: { lat: 28.6139, lng: 77.2090 }, zoom: 15 };
-    
-    const lats = feedsArray.map(f => f.location.lat);
-    const lngs = feedsArray.map(f => f.location.lng);
-    
-    const centerLat = (Math.max(...lats) + Math.min(...lats)) / 2;
-    const centerLng = (Math.max(...lngs) + Math.min(...lngs)) / 2;
-    
-    return { 
-      center: { lat: centerLat, lng: centerLng },
-      zoom: 16
-    };
-  };
-
-  const mapBounds = getMapBounds();
 
   // Group feeds by alert level for legend
   const feedsByAlertLevel = feedsArray.reduce((acc, feed) => {
@@ -155,8 +366,20 @@ export default function MapViewPage() {
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            {lastUpdated && `Last updated: ${formatTimestamp(lastUpdated)}`}
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-muted-foreground">
+              {lastUpdated && `Last updated: ${formatTimestamp(lastUpdated)}`}
+            </div>
+            <div className="flex items-center gap-1">
+              {isOnline ? (
+                <Wifi className="h-4 w-4 text-green-500" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-yellow-500" />
+              )}
+              <span className={cn("text-xs", isOnline ? "text-green-500" : "text-yellow-500")}>
+                {isOnline ? "Live" : "Offline"}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={handleRefresh} disabled={loading}>
@@ -170,6 +393,18 @@ export default function MapViewPage() {
           </div>
         </div>
 
+        {error && !isOnline && (
+          <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+            <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-medium">Demo Mode</span>
+            </div>
+            <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+              API connection failed. Showing sample data for demonstration.
+            </p>
+          </div>
+        )}
+
         <Card className="overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -180,78 +415,16 @@ export default function MapViewPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {error ? (
-              <div className="aspect-video w-full bg-muted rounded-lg flex items-center justify-center">
-                <div className="text-center">
-                  <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-                  <p className="text-red-400 font-medium">Unable to load map data</p>
-                  <p className="text-sm text-muted-foreground">{error}</p>
-                </div>
-              </div>
-            ) : loading ? (
+            {loading ? (
               <div className="aspect-video w-full bg-muted rounded-lg flex items-center justify-center">
                 <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <div className="aspect-video w-full bg-slate-100 dark:bg-slate-800 rounded-lg relative overflow-hidden">
-                {/* Simulated Map View - In real implementation, use Google Maps, Mapbox, or Leaflet */}
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-green-50 dark:from-slate-700 dark:to-slate-600">
-                  <div className="absolute inset-4">
-                    {/* Grid lines for map effect */}
-                    <div className="w-full h-full opacity-20">
-                      <div className="grid grid-cols-8 grid-rows-6 w-full h-full border border-slate-300">
-                        {Array.from({length: 48}).map((_, i) => (
-                          <div key={i} className="border border-slate-200"></div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* Feed Location Markers */}
-                    {feedsArray.map((feed, index) => {
-                      const alertConfig = alertLevelConfig[feed.alert_level];
-                      // Position markers based on relative coordinates (simplified)
-                      const x = 20 + (index * 15) % 60; // Distribute horizontally
-                      const y = 20 + Math.floor(index / 4) * 20; // Stack vertically
-                      
-                      return (
-                        <div
-                          key={feed.id}
-                          className={cn(
-                            "absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-200",
-                            selectedFeed === feed.id ? "scale-125 z-10" : "hover:scale-110"
-                          )}
-                          style={{ left: `${x}%`, top: `${y}%` }}
-                          onClick={() => setSelectedFeed(selectedFeed === feed.id ? null : feed.id)}
-                        >
-                          <div className={cn("relative p-2 rounded-full shadow-lg", alertConfig.color)}>
-                            <MapPin className="h-6 w-6 text-white" />
-                            {feed.alert_level === 'critical' && (
-                              <div className="absolute -top-1 -right-1 h-4 w-4 bg-red-600 rounded-full animate-pulse">
-                                <div className="h-full w-full bg-red-400 rounded-full animate-ping"></div>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {selectedFeed === feed.id && (
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-white dark:bg-slate-800 p-3 rounded-lg shadow-xl border min-w-48 z-20">
-                              <h4 className="font-semibold text-sm">{feed.name}</h4>
-                              <div className="text-xs text-muted-foreground space-y-1 mt-1">
-                                <p>Count: {feed.current_count}/{feed.max_capacity}</p>
-                                <p>Density: {feed.density_percentage}%</p>
-                                <p>Status: <span className={alertConfig.textColor}>{alertConfig.label}</span></p>
-                                <p>Lat: {feed.location.lat.toFixed(4)}, Lng: {feed.location.lng.toFixed(4)}</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="absolute bottom-2 right-2 text-xs text-muted-foreground bg-white/80 dark:bg-black/80 px-2 py-1 rounded">
-                  100m scale • Center: {mapBounds.center.lat.toFixed(4)}, {mapBounds.center.lng.toFixed(4)}
-                </div>
-              </div>
+              <InteractiveMap 
+                feeds={feedsArray}
+                selectedFeed={selectedFeed}
+                onFeedSelect={setSelectedFeed}
+              />
             )}
           </CardContent>
         </Card>
@@ -302,7 +475,7 @@ export default function MapViewPage() {
               </div>
             ) : (
               feedsArray.map((feed) => (
-                <div key={feed.id} className="space-y-2">
+                <div key={feed.feed_id} className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className={cn("font-medium", getStatusColor(feed.alert_level))}>
                       {feed.name}
@@ -324,7 +497,7 @@ export default function MapViewPage() {
                     indicatorClassName={getProgressColor(feed.density_percentage)} 
                   />
                   <div className="text-xs text-muted-foreground">
-                    {feed.area} • Updated {formatTimestamp(feed.last_updated)}
+                    {feed.area.replace('_', ' ')} • Updated {formatTimestamp(feed.last_updated)}
                   </div>
                 </div>
               ))
@@ -345,7 +518,7 @@ export default function MapViewPage() {
                   <>
                     <div><strong>Name:</strong> {feed.name}</div>
                     <div><strong>Location:</strong> {feed.location.lat.toFixed(6)}, {feed.location.lng.toFixed(6)}</div>
-                    <div><strong>Area:</strong> {feed.area}</div>
+                    <div><strong>Area:</strong> {feed.area.replace('_', ' ')}</div>
                     <div><strong>Capacity:</strong> {feed.current_count}/{feed.max_capacity}</div>
                     <div><strong>Density:</strong> {feed.density_percentage}%</div>
                     <div><strong>Status:</strong> 
