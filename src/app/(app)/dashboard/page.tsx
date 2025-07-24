@@ -219,9 +219,46 @@ export default function DashboardPage() {
         }
     });
 
+    // Fetch active alerts data
+    const fetchAlerts = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/alerts');
+        if (response.ok) {
+          const data = await response.json();
+          const activeAlerts = data.alerts.filter(
+            (alert: { alert_level: string; }) => alert.alert_level === 'warning' || alert.alert_level === 'critical'
+          ).length;
+
+          setMetrics(prevMetrics => {
+            const activeAlertsMetric = prevMetrics["Active Alerts"];
+            if (!activeAlertsMetric) return prevMetrics;
+
+            const currentAlerts = parseInt(activeAlertsMetric.value) || 0;
+            const changeType = activeAlerts > currentAlerts ? 'increase' : activeAlerts < currentAlerts ? 'decrease' : 'neutral';
+
+            return {
+              ...prevMetrics,
+              "Active Alerts": {
+                ...activeAlertsMetric,
+                value: activeAlerts.toString(),
+                change: `${changeType === 'increase' ? '+' : ''}${activeAlerts - currentAlerts}`,
+                changeType: changeType,
+              },
+            };
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch active alerts:", error);
+      }
+    };
+    
+    fetchAlerts();
+    const alertsInterval = setInterval(fetchAlerts, 10000); // Poll every 10 seconds
+
     return () => {
       guardsUnsubscribe();
       crowdUnsubscribe();
+      clearInterval(alertsInterval);
     };
   }, []);
 
@@ -264,7 +301,7 @@ export default function DashboardPage() {
                   className={cn(
                     "text-xs text-muted-foreground flex items-center",
                     {
-                      "text-green-400": data.changeType === "increase",
+                      "text-green-400": data.changeType === "increase" && title !== "Active Alerts",
                       "text-red-400": data.changeType === "decrease" || (title === "Active Alerts" && data.changeType === "increase"),
                     }
                   )}
