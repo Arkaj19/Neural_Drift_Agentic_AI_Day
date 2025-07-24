@@ -477,3 +477,5 @@ export default function MapViewPage() {
     </div>
   );
 }
+
+    
