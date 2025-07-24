@@ -268,7 +268,7 @@ export default function AlertsPage() {
                         {details.type} - {alert.feed_name}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {alert.area} • Density: {alert.density_percentage}%
+                        Density: {alert.density_percentage}%
                       </p>
                     </div>
                   </div>
