@@ -1,4 +1,341 @@
-'use client';
+// 'use client';
+// import { Badge } from "@/components/ui/badge";
+// import { Button } from "@/components/ui/button";
+// import {
+//   Card,
+//   CardContent,
+//   CardFooter,
+//   CardHeader,
+//   CardTitle,
+// } from "@/components/ui/card";
+// import { Skeleton } from "@/components/ui/skeleton";
+// import { cn } from "@/lib/utils";
+// import {
+//   Video,
+//   Users,
+//   Maximize,
+//   RefreshCw,
+//   Dot,
+//   AlertTriangle,
+// } from "lucide-react";
+// import { useEffect, useState } from "react";
+
+// // Backend configuration
+// const BACKEND_URL = "http://localhost:5000"; // Replace with your actual backend URL
+
+// // Feed configuration based on your backend CCTV_FEEDS
+// const FEED_IDS = ["feed_1", "feed_2", "feed_3", "feed_4", "feed_5"];
+
+// interface FeedData {
+//   name: string;
+//   current_count: number;
+//   max_capacity: number;
+//   density_percentage: number;
+//   alert_level: "normal" | "warning" | "critical";
+//   last_updated: string;
+//   location: {
+//     lat: number;
+//     lng: number;
+//   };
+//   area: string;
+// }
+
+// interface VideoStreamProps {
+//   feedId: string;
+//   feedData?: FeedData;
+//   onError?: (error: string) => void;
+// }
+
+// // Video Stream Component
+// const VideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onError }) => {
+//   const [isLoading, setIsLoading] = useState(true);
+//   const [hasError, setHasError] = useState(false);
+//   const [retryCount, setRetryCount] = useState(0);
+//   const maxRetries = 3;
+
+//   const streamUrl = `${BACKEND_URL}/api/video/stream/${feedId}`;
+
+//   const handleImageLoad = () => {
+//     setIsLoading(false);
+//     setHasError(false);
+//     setRetryCount(0);
+//   };
+
+//   const handleImageError = () => {
+//     setIsLoading(false);
+//     setHasError(true);
+    
+//     if (retryCount < maxRetries) {
+//       setTimeout(() => {
+//         setRetryCount(prev => prev + 1);
+//         setIsLoading(true);
+//         setHasError(false);
+//       }, 2000 * (retryCount + 1)); // Exponential backoff
+//     }
+    
+//     onError?.(`Failed to load video stream for ${feedId}`);
+//   };
+
+//   const handleRetry = () => {
+//     setRetryCount(0);
+//     setIsLoading(true);
+//     setHasError(false);
+//   };
+
+//   if (hasError && retryCount >= maxRetries) {
+//     return (
+//       <div className="flex flex-col items-center justify-center h-full bg-gray-900 text-white rounded-md">
+//         <AlertTriangle className="h-8 w-8 mb-2 text-red-400" />
+//         <p className="text-sm mb-2">Stream Unavailable</p>
+//         <Button size="sm" variant="outline" onClick={handleRetry}>
+//           Retry Connection
+//         </Button>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="relative w-full h-full">
+//       {isLoading && (
+//         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-md">
+//           <div className="text-white text-sm">Loading stream...</div>
+//         </div>
+//       )}
+//       <img
+//         src={streamUrl}
+//         alt={`Live feed from ${feedData?.name || feedId}`}
+//         className="w-full h-full object-cover rounded-md"
+//         style={{ display: isLoading ? 'none' : 'block' }}
+//         onLoad={handleImageLoad}
+//         onError={handleImageError}
+//       />
+//     </div>
+//   );
+// };
+
+// const getStatusBadgeVariant = (status: "normal" | "warning" | "critical") => {
+//   switch (status) {
+//     case "critical":
+//       return "destructive";
+//     case "warning":
+//       return "default";
+//     case "normal":
+//       return "secondary";
+//     default:
+//       return "outline";
+//   }
+// };
+
+// const getStatusColor = (status: "normal" | "warning" | "critical") => {
+//   switch (status) {
+//     case "critical":
+//       return "border-red-500";
+//     case "warning":
+//       return "border-yellow-500";
+//     case "normal":
+//       return "border-green-500";
+//     default:
+//       return "border-gray-500";
+//   }
+// };
+
+// const getStatusText = (status: "normal" | "warning" | "critical") => {
+//   switch (status) {
+//     case "critical":
+//       return "Critical";
+//     case "warning":
+//       return "Warning";
+//     case "normal":
+//       return "Normal";
+//     default:
+//       return "Unknown";
+//   }
+// };
+
+// export default function LiveFeedPage() {
+//   const [feedsData, setFeedsData] = useState<Record<string, FeedData>>({});
+//   const [isLoading, setIsLoading] = useState(true);
+//   const [error, setError] = useState<string | null>(null);
+//   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+//   // Fetch feeds data
+//   const fetchFeedsData = async () => {
+//     try {
+//       const response = await fetch(`${BACKEND_URL}/api/feeds`);
+//       if (!response.ok) {
+//         throw new Error(`HTTP error! status: ${response.status}`);
+//       }
+//       const data = await response.json();
+//       setFeedsData(data.feeds || {});
+//       setError(null);
+//       setLastUpdate(new Date());
+//     } catch (err) {
+//       console.error('Failed to fetch feeds data:', err);
+//       setError(err instanceof Error ? err.message : 'Failed to fetch feed data');
+//     } finally {
+//       setIsLoading(false);
+//     }
+//   };
+
+//   // Auto-refresh feeds data
+//   useEffect(() => {
+//     fetchFeedsData();
+    
+//     const interval = setInterval(fetchFeedsData, 5000); // Refresh every 5 seconds
+    
+//     return () => clearInterval(interval);
+//   }, []);
+
+//   const handleRefreshAll = () => {
+//     setIsLoading(true);
+//     fetchFeedsData();
+//     // Force reload all video streams by updating the key
+//     setLastUpdate(new Date());
+//   };
+
+//   const handleVideoError = (error: string) => {
+//     console.error('Video stream error:', error);
+//   };
+
+//   if (isLoading && Object.keys(feedsData).length === 0) {
+//     return (
+//       <div className="space-y-4">
+//         <div className="flex items-center justify-end gap-2">
+//           <Skeleton className="h-10 w-32" />
+//           <Skeleton className="h-10 w-32" />
+//         </div>
+//         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+//           {Array.from({ length: 6 }).map((_, index) => (
+//             <Card key={index}>
+//               <CardHeader>
+//                 <div className="flex justify-between items-center">
+//                   <Skeleton className="h-6 w-24" />
+//                   <Skeleton className="h-6 w-16" />
+//                 </div>
+//               </CardHeader>
+//               <CardContent>
+//                 <Skeleton className="aspect-video w-full" />
+//                 <Skeleton className="h-4 w-32 mt-2" />
+//               </CardContent>
+//               <CardFooter className="flex justify-between">
+//                 <Skeleton className="h-4 w-20" />
+//                 <Skeleton className="h-4 w-10" />
+//               </CardFooter>
+//             </Card>
+//           ))}
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="space-y-4">
+//       <div className="flex items-center justify-between">
+//         <div>
+//           <h1 className="text-2xl font-bold">Live Camera Feeds</h1>
+//           {error && (
+//             <p className="text-sm text-red-500 mt-1">
+//               Error: {error}
+//             </p>
+//           )}
+//           <p className="text-sm text-gray-500">
+//             Last updated: {lastUpdate.toLocaleTimeString()}
+//           </p>
+//         </div>
+//         <div className="flex items-center gap-2">
+//           <Button variant="outline" onClick={handleRefreshAll} disabled={isLoading}>
+//             <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
+//             Refresh All
+//           </Button>
+//           <Button variant="outline">
+//             <Maximize className="mr-2 h-4 w-4" /> Full Screen
+//           </Button>
+//         </div>
+//       </div>
+
+//       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+//         {FEED_IDS.map((feedId) => {
+//           const feedData = feedsData[feedId];
+//           const isOnline = feedData != null;
+
+//           return (
+//             <Card 
+//               key={`${feedId}-${lastUpdate.getTime()}`} 
+//               className={cn(
+//                 "flex flex-col", 
+//                 isOnline ? getStatusColor(feedData.alert_level) : "border-gray-400", 
+//                 "border-2"
+//               )}
+//             >
+//               <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+//                 <CardTitle className="text-lg font-bold">
+//                   {feedData?.name || feedId.replace('_', ' ').toUpperCase()}
+//                 </CardTitle>
+//                 <div className="flex items-center gap-2">
+//                   {isOnline && (
+//                     <Badge variant={getStatusBadgeVariant(feedData.alert_level)}>
+//                       {getStatusText(feedData.alert_level)}
+//                     </Badge>
+//                   )}
+//                   {!isOnline && (
+//                     <Badge variant="outline">Offline</Badge>
+//                   )}
+//                 </div>
+//               </CardHeader>
+
+//               <CardContent className="flex-grow">
+//                 <div className="aspect-video w-full overflow-hidden rounded-md bg-gray-900">
+//                   <VideoStream 
+//                     feedId={feedId} 
+//                     feedData={feedData}
+//                     onError={handleVideoError}
+//                   />
+//                 </div>
+                
+//                 <div className="mt-2 space-y-1">
+//                   <p className="text-sm font-medium text-foreground">
+//                     {feedData?.area?.replace('_', ' ').toUpperCase() || 'Unknown Location'}
+//                   </p>
+//                   {isOnline && (
+//                     <div className="flex items-center justify-between text-xs text-muted-foreground">
+//                       <span>
+//                         People: {feedData.current_count}/{feedData.max_capacity}
+//                       </span>
+//                       <span>
+//                         Density: {feedData.density_percentage}%
+//                       </span>
+//                     </div>
+//                   )}
+//                 </div>
+//               </CardContent>
+
+//               <CardFooter className="flex justify-between text-xs text-muted-foreground">
+//                 <div className="flex items-center gap-2">
+//                   <Video className="h-4 w-4" />
+//                   <span>640x480 @ 15fps</span>
+//                 </div>
+//                 <div className="flex items-center gap-2">
+//                   <Users className="h-4 w-4" />
+//                   <span>{feedData?.current_count || 0}</span>
+//                 </div>
+//                 {isOnline && feedData.alert_level !== 'normal' && (
+//                   <div className="flex items-center gap-1 text-red-400">
+//                     <Dot className="h-6 w-6 animate-pulse" />
+//                     <span>ALERT</span>
+//                   </div>
+//                 )}
+//               </CardFooter>
+//             </Card>
+//           );
+//         })}
+//       </div>
+//     </div>
+//   );
+// }
+
+
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,13 +354,13 @@ import {
   RefreshCw,
   Dot,
   AlertTriangle,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 // Backend configuration
-const BACKEND_URL = "http://localhost:5000"; // Replace with your actual backend URL
-
-// Feed configuration based on your backend CCTV_FEEDS
+const BACKEND_URL = "http://127.0.0.1:5000";
 const FEED_IDS = ["feed_1", "feed_2", "feed_3", "feed_4", "feed_5"];
 
 interface FeedData {
@@ -46,49 +383,132 @@ interface VideoStreamProps {
   onError?: (error: string) => void;
 }
 
-// Video Stream Component
-const VideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onError }) => {
+// Enhanced Video Stream Component with Auto-Reconnection
+const RobustVideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onError }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
+  const [isConnected, setIsConnected] = useState(false);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [lastActivity, setLastActivity] = useState(Date.now());
+  
+  const imgRef = useRef<HTMLImageElement>(null);
+  const reconnectTimerRef = useRef<NodeJS.Timeout>();
+  const activityTimerRef = useRef<NodeJS.Timeout>();
+  const streamUrlRef = useRef<string>("");
 
-  const streamUrl = `${BACKEND_URL}/api/video/stream/${feedId}`;
+  const maxReconnectAttempts = 5;
+  const reconnectDelay = 2000;
+  const activityTimeout = 10000; // 10 seconds
 
-  const handleImageLoad = () => {
+  // Generate unique stream URL to prevent caching
+  const generateStreamUrl = useCallback(() => {
+    const timestamp = Date.now();
+    return `${BACKEND_URL}/api/video/stream/${feedId}?t=${timestamp}`;
+  }, [feedId]);
+
+  // Handle successful image load
+  const handleImageLoad = useCallback(() => {
+    console.log(`✅ Video stream connected for ${feedId}`);
     setIsLoading(false);
     setHasError(false);
-    setRetryCount(0);
-  };
+    setIsConnected(true);
+    setReconnectAttempts(0);
+    setLastActivity(Date.now());
+    
+    // Clear any existing reconnect timer
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+    }
+  }, [feedId]);
 
-  const handleImageError = () => {
+  // Handle image load error
+  const handleImageError = useCallback((e: any) => {
+    console.error(`❌ Video stream error for ${feedId}:`, e);
     setIsLoading(false);
     setHasError(true);
+    setIsConnected(false);
+    onError?.(`Stream error for ${feedId}`);
     
-    if (retryCount < maxRetries) {
-      setTimeout(() => {
-        setRetryCount(prev => prev + 1);
+    // Attempt reconnection if within limits
+    if (reconnectAttempts < maxReconnectAttempts) {
+      const delay = reconnectDelay * Math.pow(2, reconnectAttempts); // Exponential backoff
+      console.log(`🔄 Reconnecting ${feedId} in ${delay}ms (attempt ${reconnectAttempts + 1})`);
+      
+      reconnectTimerRef.current = setTimeout(() => {
+        setReconnectAttempts(prev => prev + 1);
         setIsLoading(true);
         setHasError(false);
-      }, 2000 * (retryCount + 1)); // Exponential backoff
+        streamUrlRef.current = generateStreamUrl();
+        
+        if (imgRef.current) {
+          imgRef.current.src = streamUrlRef.current;
+        }
+      }, delay);
     }
-    
-    onError?.(`Failed to load video stream for ${feedId}`);
-  };
+  }, [feedId, reconnectAttempts, generateStreamUrl, onError]);
 
-  const handleRetry = () => {
-    setRetryCount(0);
+  // Manual retry function
+  const handleManualRetry = useCallback(() => {
+    console.log(`🔄 Manual retry for ${feedId}`);
+    setReconnectAttempts(0);
     setIsLoading(true);
     setHasError(false);
-  };
+    streamUrlRef.current = generateStreamUrl();
+    
+    if (imgRef.current) {
+      imgRef.current.src = streamUrlRef.current;
+    }
+  }, [feedId, generateStreamUrl]);
 
-  if (hasError && retryCount >= maxRetries) {
+  // Monitor stream activity (detect frozen streams)
+  useEffect(() => {
+    if (isConnected && !hasError) {
+      activityTimerRef.current = setInterval(() => {
+        const timeSinceLastActivity = Date.now() - lastActivity;
+        
+        if (timeSinceLastActivity > activityTimeout) {
+          console.warn(`⚠️ Stream ${feedId} appears frozen, reconnecting...`);
+          handleManualRetry();
+        }
+      }, activityTimeout);
+    }
+
+    return () => {
+      if (activityTimerRef.current) {
+        clearInterval(activityTimerRef.current);
+      }
+    };
+  }, [isConnected, hasError, lastActivity, feedId, handleManualRetry]);
+
+  // Initialize stream
+  useEffect(() => {
+    streamUrlRef.current = generateStreamUrl();
+    
+    return () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
+      if (activityTimerRef.current) {
+        clearInterval(activityTimerRef.current);
+      }
+    };
+  }, [generateStreamUrl]);
+
+  // Update activity timestamp when image changes (indicates new frame)
+  const handleImageUpdate = useCallback(() => {
+    setLastActivity(Date.now());
+  }, []);
+
+  if (hasError && reconnectAttempts >= maxReconnectAttempts) {
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-gray-900 text-white rounded-md">
-        <AlertTriangle className="h-8 w-8 mb-2 text-red-400" />
-        <p className="text-sm mb-2">Stream Unavailable</p>
-        <Button size="sm" variant="outline" onClick={handleRetry}>
-          Retry Connection
+      <div className="flex flex-col items-center justify-center h-full bg-gray-900 text-white rounded-md p-4">
+        <WifiOff className="h-8 w-8 mb-2 text-red-400" />
+        <p className="text-sm mb-2 text-center">Stream Unavailable</p>
+        <p className="text-xs mb-3 text-gray-400 text-center">
+          Failed after {maxReconnectAttempts} attempts
+        </p>
+        <Button size="sm" variant="outline" onClick={handleManualRetry}>
+          Try Again
         </Button>
       </div>
     );
@@ -96,18 +516,41 @@ const VideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onError }) 
 
   return (
     <div className="relative w-full h-full">
+      {/* Loading overlay */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-md">
-          <div className="text-white text-sm">Loading stream...</div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 rounded-md z-10">
+          <div className="text-white text-sm mb-2">
+            {reconnectAttempts > 0 ? `Reconnecting... (${reconnectAttempts}/${maxReconnectAttempts})` : 'Loading stream...'}
+          </div>
+          <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
         </div>
       )}
+
+      {/* Connection status indicator */}
+      <div className="absolute top-2 right-2 z-20">
+        {isConnected ? (
+          <div className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded text-xs">
+            <Wifi className="h-3 w-3" />
+            <span>LIVE</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 bg-red-600 text-white px-2 py-1 rounded text-xs">
+            <WifiOff className="h-3 w-3" />
+            <span>OFFLINE</span>
+          </div>
+        )}
+      </div>
+
+      {/* Video stream */}
       <img
-        src={streamUrl}
+        ref={imgRef}
+        src={streamUrlRef.current}
         alt={`Live feed from ${feedData?.name || feedId}`}
         className="w-full h-full object-cover rounded-md"
         style={{ display: isLoading ? 'none' : 'block' }}
         onLoad={handleImageLoad}
         onError={handleImageError}
+        onLoadStart={handleImageUpdate}
       />
     </div>
   );
@@ -157,21 +600,31 @@ export default function LiveFeedPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [connectionStatus, setConnectionStatus] = useState<'online' | 'offline'>('offline');
 
-  // Fetch feeds data
+  // Fetch feeds data with improved error handling
   const fetchFeedsData = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/feeds`);
+      const response = await fetch(`${BACKEND_URL}/api/feeds`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
       const data = await response.json();
       setFeedsData(data.feeds || {});
       setError(null);
       setLastUpdate(new Date());
+      setConnectionStatus('online');
     } catch (err) {
       console.error('Failed to fetch feeds data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch feed data');
+      setConnectionStatus('offline');
     } finally {
       setIsLoading(false);
     }
@@ -181,7 +634,8 @@ export default function LiveFeedPage() {
   useEffect(() => {
     fetchFeedsData();
     
-    const interval = setInterval(fetchFeedsData, 5000); // Refresh every 5 seconds
+    // Refresh every 3 seconds for real-time data
+    const interval = setInterval(fetchFeedsData, 3000);
     
     return () => clearInterval(interval);
   }, []);
@@ -189,8 +643,7 @@ export default function LiveFeedPage() {
   const handleRefreshAll = () => {
     setIsLoading(true);
     fetchFeedsData();
-    // Force reload all video streams by updating the key
-    setLastUpdate(new Date());
+    setLastUpdate(new Date()); // Force video component re-render
   };
 
   const handleVideoError = (error: string) => {
@@ -199,14 +652,21 @@ export default function LiveFeedPage() {
 
   if (isLoading && Object.keys(feedsData).length === 0) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-end gap-2">
-          <Skeleton className="h-10 w-32" />
-          <Skeleton className="h-10 w-32" />
+      <div className="space-y-4 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Live Camera Feeds</h1>
+            <p className="text-sm text-gray-500">Loading...</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32" />
+          </div>
         </div>
+        
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Card key={index}>
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Card key={index} className="min-h-[400px]">
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <Skeleton className="h-6 w-24" />
@@ -214,12 +674,14 @@ export default function LiveFeedPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <Skeleton className="aspect-video w-full" />
-                <Skeleton className="h-4 w-32 mt-2" />
+                <Skeleton className="aspect-video w-full mb-2" />
+                <Skeleton className="h-4 w-32" />
               </CardContent>
-              <CardFooter className="flex justify-between">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-10" />
+              <CardFooter>
+                <div className="flex justify-between w-full">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-10" />
+                </div>
               </CardFooter>
             </Card>
           ))}
@@ -229,18 +691,36 @@ export default function LiveFeedPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Live Camera Feeds</h1>
+          <div className="flex items-center gap-4 mt-1">
+            <p className="text-sm text-gray-500">
+              Last updated: {lastUpdate.toLocaleTimeString()}
+            </p>
+            <div className={cn(
+              "flex items-center gap-1 text-xs px-2 py-1 rounded",
+              connectionStatus === 'online' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+            )}>
+              {connectionStatus === 'online' ? (
+                <>
+                  <Wifi className="h-3 w-3" />
+                  <span>System Online</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-3 w-3" />
+                  <span>System Offline</span>
+                </>
+              )}
+            </div>
+          </div>
           {error && (
             <p className="text-sm text-red-500 mt-1">
               Error: {error}
             </p>
           )}
-          <p className="text-sm text-gray-500">
-            Last updated: {lastUpdate.toLocaleTimeString()}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={handleRefreshAll} disabled={isLoading}>
@@ -260,9 +740,9 @@ export default function LiveFeedPage() {
 
           return (
             <Card 
-              key={`${feedId}-${lastUpdate.getTime()}`} 
+              key={feedId}
               className={cn(
-                "flex flex-col", 
+                "flex flex-col min-h-[450px]", 
                 isOnline ? getStatusColor(feedData.alert_level) : "border-gray-400", 
                 "border-2"
               )}
@@ -284,15 +764,15 @@ export default function LiveFeedPage() {
               </CardHeader>
 
               <CardContent className="flex-grow">
-                <div className="aspect-video w-full overflow-hidden rounded-md bg-gray-900">
-                  <VideoStream 
+                <div className="aspect-video w-full overflow-hidden rounded-md bg-gray-900 mb-3">
+                  <RobustVideoStream 
                     feedId={feedId} 
                     feedData={feedData}
                     onError={handleVideoError}
                   />
                 </div>
                 
-                <div className="mt-2 space-y-1">
+                <div className="space-y-1">
                   <p className="text-sm font-medium text-foreground">
                     {feedData?.area?.replace('_', ' ').toUpperCase() || 'Unknown Location'}
                   </p>
