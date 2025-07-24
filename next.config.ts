@@ -1,4 +1,29 @@
-import type {NextConfig} from 'next';
+// import type {NextConfig} from 'next';
+
+// const nextConfig: NextConfig = {
+//   /* config options here */
+//   typescript: {
+//     ignoreBuildErrors: true,
+//   },
+//   eslint: {
+//     ignoreDuringBuilds: true,
+//   },
+//   images: {
+//     remotePatterns: [
+//       {
+//         protocol: 'https',
+//         hostname: 'placehold.co',
+//         port: '',
+//         pathname: '/**',
+//       },
+//     ],
+//   },
+// };
+
+// export default nextConfig;
+
+
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -17,6 +42,37 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+    unoptimized: true, // For video streams
+  },
+  async rewrites() {
+    return [
+      // Optional: Proxy video streams through Next.js to avoid CORS issues
+      {
+        source: '/api/video/:path*',
+        destination: 'http://localhost:5000/api/video/:path*', // Replace with your backend URL
+      },
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: '/api/video/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+        ],
+      },
+    ];
   },
 };
 
