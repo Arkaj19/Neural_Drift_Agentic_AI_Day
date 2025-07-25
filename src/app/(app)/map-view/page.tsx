@@ -87,20 +87,18 @@ const InteractiveMap = ({ feeds }: {
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maptilersdk.Map | null>(null);
-  const markers = useRef<maptilersdk.Marker[]>([]);
   const [lng] = useState(77.6353);
   const [lat] = useState(12.9667);
   const [zoom] = useState(14);
   const apiKey = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
 
-  // Initialize map
   useEffect(() => {
     if (!apiKey) {
       console.error("MapTiler API key is missing. Please add it to your .env file.");
       return;
     }
 
-    if (map.current || !mapContainer.current) return; // Initialize map only once
+    if (map.current || !mapContainer.current) return; // stops map from intializing more than once
 
     maptilersdk.config.apiKey = apiKey;
 
@@ -111,17 +109,6 @@ const InteractiveMap = ({ feeds }: {
       zoom: zoom
     });
 
-  }, [apiKey, lat, lng, zoom]);
-
-  // Update markers when feeds data changes
-  useEffect(() => {
-    if (!map.current || !feeds) return;
-
-    // Clear existing markers
-    markers.current.forEach(marker => marker.remove());
-    markers.current = [];
-
-    // Add new markers
     feeds.forEach(feed => {
       const el = document.createElement('div');
       el.className = `p-2 rounded-full shadow-lg border-2 border-white ${alertLevelConfig[feed.alert_level]?.color || 'bg-gray-500'}`;
@@ -143,17 +130,15 @@ const InteractiveMap = ({ feeds }: {
           </div>
         `);
 
-      const newMarker = new maptilersdk.Marker({ 
+      new maptilersdk.Marker({ 
           element: el,
           color: alertLevelConfig[feed.alert_level].markerColor 
       })
       .setLngLat([feed.location.lng, feed.location.lat])
       .setPopup(popup)
       .addTo(map.current!);
-      
-      markers.current.push(newMarker);
     });
-  }, [feeds]);
+  }, [apiKey, lat, lng, zoom, feeds]);
 
   if (!apiKey) {
     return (
@@ -384,3 +369,5 @@ export default function MapViewPage() {
     </div>
   );
 }
+
+    
