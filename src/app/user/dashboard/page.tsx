@@ -169,7 +169,7 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
                     <CardHeader>
                         <CardTitle>{report.personName}</CardTitle>
                         <CardDescription>
-                            Reported by {report.submittedBy} • {formatTimestamp(report.submittedAt)}
+                            Reported by {report.submittedBy} • {report.submittedAt ? formatTimestamp(report.submittedAt) : 'a few moments ago'}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-2 text-sm">
