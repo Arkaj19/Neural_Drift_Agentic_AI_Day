@@ -16,18 +16,67 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRouter } from 'next/navigation';
 import { Icons } from '@/components/icons';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [role, setRole] = useState<'user' | 'admin'>('user');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, you'd handle auth here.
-    if (role === 'admin') {
-      router.push('/dashboard');
-    } else {
+    setLoading(true);
+
+    if (role === 'user') {
+      // For now, user login is direct.
+      // In a real app, you would add user authentication against the 'users' collection.
       router.push('/user/dashboard');
+      return;
+    }
+
+    if (role === 'admin') {
+      try {
+        const adminRef = collection(db, 'admin');
+        const q = query(
+          adminRef,
+          where('username', '==', username),
+          where('email', '==', email),
+          where('password', '==', password),
+          where('employee_id', '==', employeeId)
+        );
+
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          toast({
+            title: 'Login Failed',
+            description: 'Invalid credentials. Please check your details and try again.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Login Successful',
+            description: 'Welcome back, admin!',
+          });
+          router.push('/dashboard');
+        }
+      } catch (error) {
+        console.error('Error logging in admin: ', error);
+        toast({
+          title: 'Error',
+          description: 'An error occurred during login. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -64,15 +113,35 @@ export default function LoginPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
-                <Input id="username" type="text" placeholder="john.doe" required />
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="john.doe"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="operator@drishti.ai" required />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="operator@drishti.ai"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" required />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.targe.value)}
+                  required
+                />
               </div>
 
               <div className="space-y-2">
@@ -81,15 +150,21 @@ export default function LoginPage() {
                   id="employeeId"
                   type="text"
                   placeholder="DRISHTI-007"
+                  value={employeeId}
+                  onChange={(e) => setEmployeeId(e.target.value)}
                   disabled={role === 'user'}
                   required={role === 'admin'}
                   className={cn(role === 'user' && 'bg-muted/50')}
                 />
               </div>
 
-              <Button type="submit" className="w-full text-lg font-semibold" size="lg">
-                <LogIn className="mr-2 h-5 w-5" />
-                Login
+              <Button type="submit" className="w-full text-lg font-semibold" size="lg" disabled={loading}>
+                {loading ? 'Logging in...' : (
+                  <>
+                    <LogIn className="mr-2 h-5 w-5" />
+                    Login
+                  </>
+                )}
               </Button>
                <Button variant="link" size="sm" className="w-full" onClick={() => router.push('/')}>
                 Back to Home
