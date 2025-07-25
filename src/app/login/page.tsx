@@ -34,49 +34,63 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    if (role === 'user') {
-      // For now, user login is direct.
-      // In a real app, you would add user authentication against the 'users' collection.
-      router.push('/user/dashboard');
-      return;
-    }
+    try {
+        if (role === 'user') {
+            const userRef = collection(db, 'users');
+            const q = query(userRef, where('email', '==', email));
+            const querySnapshot = await getDocs(q);
 
-    if (role === 'admin') {
-      try {
-        const adminRef = collection(db, 'admin');
-        const q = query(
-          adminRef,
-          where('username', '==', username),
-          where('email', '==', email),
-          where('password', '==', password),
-          where('employee_id', '==', employeeId)
-        );
-
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-          toast({
-            title: 'Login Failed',
-            description: 'Invalid credentials. Please check your details and try again.',
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Login Successful',
-            description: 'Welcome back, admin!',
-          });
-          router.push('/dashboard');
+            if (querySnapshot.empty) {
+                toast({
+                    title: 'Login Failed',
+                    description: 'No user found with this email.',
+                    variant: 'destructive',
+                });
+            } else {
+                // In a real app, you would also verify the password.
+                // For this demo, we assume the email is enough.
+                localStorage.setItem('userEmail', email); // Store user email
+                router.push('/user/dashboard');
+            }
+            return;
         }
-      } catch (error) {
-        console.error('Error logging in admin: ', error);
+
+        if (role === 'admin') {
+            const adminRef = collection(db, 'admin');
+            const q = query(
+                adminRef,
+                where('username', '==', username),
+                where('email', '==', email),
+                where('password', '==', password),
+                where('employee_id', '==', employeeId)
+            );
+
+            const querySnapshot = await getDocs(q);
+
+            if (querySnapshot.empty) {
+                toast({
+                    title: 'Login Failed',
+                    description: 'Invalid admin credentials. Please check your details and try again.',
+                    variant: 'destructive',
+                });
+            } else {
+                toast({
+                    title: 'Login Successful',
+                    description: 'Welcome back, admin!',
+                });
+                localStorage.setItem('userEmail', email); // Store admin email
+                router.push('/dashboard');
+            }
+        }
+    } catch (error) {
+        console.error('Error logging in: ', error);
         toast({
-          title: 'Error',
-          description: 'An error occurred during login. Please try again.',
-          variant: 'destructive',
+            title: 'Error',
+            description: 'An error occurred during login. Please try again.',
+            variant: 'destructive',
         });
-      } finally {
+    } finally {
         setLoading(false);
-      }
     }
   };
 
@@ -110,8 +124,8 @@ export default function LoginPage() {
                   </div>
                 </RadioGroup>
               </div>
-
-              <div className="space-y-2">
+              
+              <div className={cn("space-y-2", role === 'user' && 'hidden')}>
                 <Label htmlFor="username">Username</Label>
                 <Input
                   id="username"
@@ -119,9 +133,10 @@ export default function LoginPage() {
                   placeholder="john.doe"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  required
+                  required={role === 'admin'}
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

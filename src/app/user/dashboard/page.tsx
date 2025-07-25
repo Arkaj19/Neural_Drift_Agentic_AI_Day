@@ -27,7 +27,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 
 
-interface UserProfile {
+export interface UserProfile {
     id: string;
     fullName: string;
     email: string;
@@ -203,7 +203,7 @@ function UserProfileDisplay({ user, loading }: { user: UserProfile | null, loadi
         return (
             <Card className="mb-6">
                 <CardContent className="p-4 text-center text-muted-foreground">
-                    No user profile found. Please sign up to create a profile.
+                    Could not load user profile. Please log in again.
                 </CardContent>
             </Card>
         );
@@ -248,24 +248,35 @@ export default function UserDashboardPage() {
   const [loadingUser, setLoadingUser] = useState(true);
 
   useEffect(() => {
-    const fetchUser = async () => {
+    // This effect runs only on the client-side
+    const loggedInUserEmail = localStorage.getItem('userEmail');
+
+    const fetchUser = async (email: string) => {
+        setLoadingUser(true);
         try {
-            // In a real app, you'd get the currently authenticated user.
-            // For this demo, we'll fetch the first user from the collection.
-            const q = query(collection(db, "users"), limit(1));
+            const q = query(collection(db, "users"), where("email", "==", email), limit(1));
             const querySnapshot = await getDocs(q);
             if (!querySnapshot.empty) {
                 const userDoc = querySnapshot.docs[0];
                 const userData = userDoc.data() as Omit<UserProfile, 'id'>;
                 setUser({ id: userDoc.id, ...userData });
+            } else {
+                 console.log("No such user!");
+                 setUser(null);
             }
         } catch (error) {
             console.error("Error fetching user profile:", error);
+            setUser(null);
         } finally {
             setLoadingUser(false);
         }
     };
-    fetchUser();
+
+    if (loggedInUserEmail) {
+        fetchUser(loggedInUserEmail);
+    } else {
+        setLoadingUser(false); // No user is logged in
+    }
 
     const qGrievances = query(collection(db, "grievances"), where("type", "==", "Missing Person"), where("status", "==", "new"));
     const unsubscribeGrievances = onSnapshot(qGrievances, (querySnapshot) => {
