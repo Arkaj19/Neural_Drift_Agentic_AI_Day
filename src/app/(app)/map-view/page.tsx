@@ -110,9 +110,8 @@ const InteractiveMap = ({ feeds }: {
     });
     
     feeds.forEach(feed => {
-        const { color } = alertLevelConfig[feed.alert_level];
         const el = document.createElement('div');
-        el.className = `p-2 rounded-full shadow-lg border-2 border-white ${color}`;
+        el.className = `p-2 rounded-full shadow-lg border-2 border-white ${alertLevelConfig[feed.alert_level]?.color || 'bg-gray-500'}`;
         el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
 
 
@@ -167,13 +166,12 @@ export default function MapViewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState('');
-  const [selectedFeed, setSelectedFeed] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(true);
 
   const fetchFeeds = async () => {
     try {
-      setError(null);
       setLoading(true);
+      setError(null);
       
       const response = await fetch('http://localhost:5000/api/feeds');
       
@@ -187,7 +185,6 @@ export default function MapViewPage() {
       setIsOnline(true);
       
     } catch (err) {
-      console.error('API call failed, will not use mock data:', err);
       setError(err instanceof Error ? err.message : 'API not available');
       setIsOnline(false);
       
@@ -206,10 +203,7 @@ export default function MapViewPage() {
     fetchFeeds();
   };
 
-  const feedsArray = Object.entries(feeds).map(([id, feed]) => ({
-    ...feed,
-    feed_id: id
-  }));
+  const feedsArray = Object.values(feeds);
 
   // Group feeds by alert level for legend
   const feedsByAlertLevel = feedsArray.reduce((acc, feed) => {
@@ -302,7 +296,7 @@ export default function MapViewPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {Object.entries(alertLevelConfig).map(([level, config]) => {
-              const count = feedsByAlertLevel[level]?.length || 0;
+              const count = feedsByAlertLevel[level as keyof typeof feedsByAlertLevel]?.length || 0;
               const Icon = config.icon;
               return (
                 <div key={level} className="flex items-center justify-between">
@@ -373,3 +367,5 @@ export default function MapViewPage() {
     </div>
   );
 }
+
+    
