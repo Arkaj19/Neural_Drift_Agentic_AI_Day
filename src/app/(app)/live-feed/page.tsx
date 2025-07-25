@@ -54,11 +54,11 @@ const RobustVideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onErr
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const [lastActivity, setLastActivity] = useState(Date.now());
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
   
   const imgRef = useRef<HTMLImageElement>(null);
   const reconnectTimerRef = useRef<NodeJS.Timeout>();
   const activityTimerRef = useRef<NodeJS.Timeout>();
-  const streamUrlRef = useRef<string>("");
 
   const maxReconnectAttempts = 5;
   const reconnectDelay = 2000;
@@ -102,11 +102,7 @@ const RobustVideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onErr
         setReconnectAttempts(prev => prev + 1);
         setIsLoading(true);
         setHasError(false);
-        streamUrlRef.current = generateStreamUrl();
-        
-        if (imgRef.current) {
-          imgRef.current.src = streamUrlRef.current;
-        }
+        setStreamUrl(generateStreamUrl());
       }, delay);
     }
   }, [feedId, reconnectAttempts, generateStreamUrl, onError]);
@@ -117,11 +113,7 @@ const RobustVideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onErr
     setReconnectAttempts(0);
     setIsLoading(true);
     setHasError(false);
-    streamUrlRef.current = generateStreamUrl();
-    
-    if (imgRef.current) {
-      imgRef.current.src = streamUrlRef.current;
-    }
+    setStreamUrl(generateStreamUrl());
   }, [feedId, generateStreamUrl]);
 
   // Monitor stream activity (detect frozen streams)
@@ -146,7 +138,7 @@ const RobustVideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onErr
 
   // Initialize stream
   useEffect(() => {
-    streamUrlRef.current = generateStreamUrl();
+    setStreamUrl(generateStreamUrl());
     
     return () => {
       if (reconnectTimerRef.current) {
@@ -206,16 +198,18 @@ const RobustVideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onErr
       </div>
 
       {/* Video stream */}
-      <img
-        ref={imgRef}
-        src={streamUrlRef.current}
-        alt={`Live feed from ${feedData?.name || feedId}`}
-        className="w-full h-full object-cover rounded-md"
-        style={{ display: isLoading ? 'none' : 'block' }}
-        onLoad={handleImageLoad}
-        onError={handleImageError}
-        onLoadStart={handleImageUpdate}
-      />
+      {streamUrl && (
+        <img
+          ref={imgRef}
+          src={streamUrl}
+          alt={`Live feed from ${feedData?.name || feedId}`}
+          className="w-full h-full object-cover rounded-md"
+          style={{ display: isLoading ? 'none' : 'block' }}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          onLoadStart={handleImageUpdate}
+        />
+      )}
     </div>
   );
 };
