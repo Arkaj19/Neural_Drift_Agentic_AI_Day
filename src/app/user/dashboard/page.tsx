@@ -216,7 +216,7 @@ export default function UserDashboardPage() {
                     <CardDescription>Report a person who is missing.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <GrievanceForm key={`missing-${formKey}`} type="Missing Person" onSuccess={() => setFormK(k => k + 1)} />
+                    <GrievanceForm key={`missing-${formKey}`} type="Missing Person" onSuccess={() => setFormKey(k => k + 1)} />
                 </CardContent>
             </Card>
              <Card>
