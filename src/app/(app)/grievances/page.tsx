@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -29,7 +30,7 @@ export interface Grievance {
     nanoseconds: number;
   };
   status: 'new' | 'resolved';
-  submittedBy?: string; // email of the user
+  submittedBy?: string; // name of the user
   personName?: string; // For missing person
   lastSeen?: string; // For missing person
 }

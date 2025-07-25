@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import {
@@ -37,10 +38,10 @@ export interface UserProfile {
 interface GrievanceFormProps {
   type: 'Medical Attention' | 'Missing Person' | 'General Grievance';
   onSuccess: () => void;
-  userEmail: string | null;
+  user: UserProfile | null;
 }
 
-function GrievanceForm({ type, onSuccess, userEmail }: GrievanceFormProps) {
+function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
   const [details, setDetails] = useState('');
   const [personName, setPersonName] = useState('');
   const [lastSeen, setLastSeen] = useState('');
@@ -51,7 +52,7 @@ function GrievanceForm({ type, onSuccess, userEmail }: GrievanceFormProps) {
     e.preventDefault();
     setLoading(true);
 
-    if (!userEmail) {
+    if (!user || !user.fullName) {
         toast({
             title: "Submission Failed",
             description: "Could not identify the user. Please make sure you are logged in.",
@@ -67,7 +68,7 @@ function GrievanceForm({ type, onSuccess, userEmail }: GrievanceFormProps) {
         details,
         status: 'new',
         submittedAt: serverTimestamp(),
-        submittedBy: userEmail,
+        submittedBy: user.fullName,
       };
 
       if (type === 'Missing Person') {
@@ -121,7 +122,7 @@ function GrievanceForm({ type, onSuccess, userEmail }: GrievanceFormProps) {
         </Label>
         <Textarea id="details" value={details} onChange={(e) => setDetails(e.target.value)} required />
       </div>
-      <Button type="submit" disabled={loading || !userEmail} className="w-full">
+      <Button type="submit" disabled={loading || !user} className="w-full">
         {loading ? 'Submitting...' : 'Submit Report'}
       </Button>
     </form>
@@ -303,7 +304,7 @@ export default function UserDashboardPage() {
                     <CardDescription>Request immediate medical assistance.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <GrievanceForm key={`medical-${formKey}`} type="Medical Attention" onSuccess={() => setFormKey(k => k + 1)} userEmail={user?.email || null} />
+                    <GrievanceForm key={`medical-${formKey}`} type="Medical Attention" onSuccess={() => setFormKey(k => k + 1)} user={user} />
                 </CardContent>
             </Card>
              <Card>
@@ -314,7 +315,7 @@ export default function UserDashboardPage() {
                     <CardDescription>Report a person who is missing.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <GrievanceForm key={`missing-${formKey}`} type="Missing Person" onSuccess={() => setFormKey(k => k + 1)} userEmail={user?.email || null} />
+                    <GrievanceForm key={`missing-${formKey}`} type="Missing Person" onSuccess={() => setFormKey(k => k + 1)} user={user} />
                 </CardContent>
             </Card>
              <Card>
@@ -325,7 +326,7 @@ export default function UserDashboardPage() {
                     <CardDescription>Report any other issues (e.g., lost item, safety concern).</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <GrievanceForm key={`general-${formKey}`} type="General Grievance" onSuccess={() => setFormKey(k => k + 1)} userEmail={user?.email || null} />
+                    <GrievanceForm key={`general-${formKey}`} type="General Grievance" onSuccess={() => setFormKey(k => k + 1)} user={user} />
                 </CardContent>
             </Card>
         </div>
