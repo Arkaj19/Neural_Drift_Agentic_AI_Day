@@ -7,14 +7,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { User, Search, Stethoscope, MessageSquareWarning, AlertTriangle } from "lucide-react";
+import { User, Search, Stethoscope, MessageSquareWarning, AlertTriangle, Mail, Phone, UserCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs, limit } from 'firebase/firestore';
 import type { Grievance } from '@/app/(app)/grievances/page';
 import {
   Carousel,
@@ -23,6 +23,16 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
+
+
+interface UserProfile {
+    id: string;
+    fullName: string;
+    email: string;
+    phone: string;
+}
 
 interface GrievanceFormProps {
   type: 'Medical Attention' | 'Missing Person' | 'General Grievance';
@@ -174,9 +184,71 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
   );
 }
 
+function UserProfileDisplay() {
+    const [user, setUser] = useState<UserProfile | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            try {
+                // Using the hardcoded email as we don't have auth state
+                const q = query(collection(db, "users"), where("email", "==", "testuser@example.com"), limit(1));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    const userData = querySnapshot.docs[0].data() as Omit<UserProfile, 'id'>;
+                    setUser({ id: querySnapshot.docs[0].id, ...userData });
+                }
+            } catch (error) {
+                console.error("Error fetching user profile:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchUser();
+    }, []);
+
+    if (loading) {
+        return <Skeleton className="h-24 w-full mb-6" />;
+    }
+
+    if (!user) {
+        return null;
+    }
+
+    const getInitials = (name: string) => {
+        return name.split(' ').map(n => n[0]).join('').toUpperCase();
+    }
+
+    return (
+        <Card className="mb-6 overflow-hidden">
+            <CardContent className="p-4 flex items-center gap-4">
+                <Avatar className="h-16 w-16">
+                    <AvatarFallback className="text-xl">
+                        {getInitials(user.fullName)}
+                    </AvatarFallback>
+                </Avatar>
+                <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div>
+                        <h3 className="text-xl font-bold">{user.fullName}</h3>
+                        <p className="text-sm text-muted-foreground">Welcome back!</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <span>{user.email}</span>
+                    </div>
+                     <div className="flex items-center gap-2 text-sm">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>{user.phone}</span>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
 
 export default function UserDashboardPage() {
-  const [formKey, setFormKey] = useState(0); // Used to reset form state
+  const [formKey, setFormKey] = useState(0); 
   const [missingPersonReports, setMissingPersonReports] = useState<Grievance[]>([]);
 
   useEffect(() => {
@@ -192,11 +264,12 @@ export default function UserDashboardPage() {
 
   return (
     <div className="space-y-4">
+        <UserProfileDisplay />
         <MissingPersonsCarousel reports={missingPersonReports} />
 
         <h1 className="text-3xl font-bold">User Dashboard</h1>
         <p className="text-muted-foreground">Report issues and request assistance.</p>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -228,17 +301,6 @@ export default function UserDashboardPage() {
                 </CardHeader>
                 <CardContent>
                     <GrievanceForm key={`general-${formKey}`} type="General Grievance" onSuccess={() => setFormKey(k => k + 1)} />
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <User /> My Profile
-                    </CardTitle>
-                    <CardDescription>View and manage your profile information.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground">This section is under construction. Future updates will allow you to view your submitted reports and manage your account.</p>
                 </CardContent>
             </Card>
         </div>
