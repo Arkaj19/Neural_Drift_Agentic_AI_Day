@@ -87,18 +87,20 @@ const InteractiveMap = ({ feeds }: {
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maptilersdk.Map | null>(null);
+  const markers = useRef<maptilersdk.Marker[]>([]);
   const [lng] = useState(77.6353);
   const [lat] = useState(12.9667);
   const [zoom] = useState(14);
   const apiKey = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
 
+  // Initialize map
   useEffect(() => {
     if (!apiKey) {
       console.error("MapTiler API key is missing. Please add it to your .env file.");
       return;
     }
 
-    if (map.current || !mapContainer.current) return;
+    if (map.current || !mapContainer.current) return; // Initialize map only once
 
     maptilersdk.config.apiKey = apiKey;
 
@@ -108,39 +110,50 @@ const InteractiveMap = ({ feeds }: {
       center: [lng, lat],
       zoom: zoom
     });
-    
+
+  }, [apiKey, lat, lng, zoom]);
+
+  // Update markers when feeds data changes
+  useEffect(() => {
+    if (!map.current || !feeds) return;
+
+    // Clear existing markers
+    markers.current.forEach(marker => marker.remove());
+    markers.current = [];
+
+    // Add new markers
     feeds.forEach(feed => {
-        const el = document.createElement('div');
-        el.className = `p-2 rounded-full shadow-lg border-2 border-white ${alertLevelConfig[feed.alert_level]?.color || 'bg-gray-500'}`;
-        el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
+      const el = document.createElement('div');
+      el.className = `p-2 rounded-full shadow-lg border-2 border-white ${alertLevelConfig[feed.alert_level]?.color || 'bg-gray-500'}`;
+      el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
 
+      const popup = new maptilersdk.Popup({ closeButton: false, offset: 25 })
+        .setHTML(`
+          <div class="p-2 bg-card text-card-foreground rounded-lg shadow-xl border min-w-56">
+              <h4 class="font-semibold text-base mb-2 text-center">${feed.name}</h4>
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                  <div><p class="text-muted-foreground">Count</p><p class="font-semibold">${feed.current_count}/${feed.max_capacity}</p></div>
+                  <div><p class="text-muted-foreground">Density</p><p class="font-semibold">${feed.density_percentage}%</p></div>
+                  <div><p class="text-muted-foreground">Status</p><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${feed.alert_level === 'critical' ? 'bg-destructive text-destructive-foreground' : feed.alert_level === 'warning' ? 'bg-yellow-500 text-black' : 'bg-secondary text-secondary-foreground'}">${alertLevelConfig[feed.alert_level].label}</span></div>
+                  <div><p class="text-muted-foreground">Area</p><p class="font-semibold capitalize">${feed.area.replace('_', ' ')}</p></div>
+              </div>
+              <div class="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                  📍 ${feed.location.lat.toFixed(4)}, ${feed.location.lng.toFixed(4)}
+              </div>
+          </div>
+        `);
 
-        const popup = new maptilersdk.Popup({ closeButton: false, offset: 25 })
-          .setHTML(`
-            <div class="p-2 bg-card text-card-foreground rounded-lg shadow-xl border min-w-56">
-                <h4 class="font-semibold text-base mb-2 text-center">${feed.name}</h4>
-                <div class="grid grid-cols-2 gap-2 text-sm">
-                    <div><p class="text-muted-foreground">Count</p><p class="font-semibold">${feed.current_count}/${feed.max_capacity}</p></div>
-                    <div><p class="text-muted-foreground">Density</p><p class="font-semibold">${feed.density_percentage}%</p></div>
-                    <div><p class="text-muted-foreground">Status</p><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${feed.alert_level === 'critical' ? 'bg-destructive text-destructive-foreground' : feed.alert_level === 'warning' ? 'bg-yellow-500 text-black' : 'bg-secondary text-secondary-foreground'}">${alertLevelConfig[feed.alert_level].label}</span></div>
-                    <div><p class="text-muted-foreground">Area</p><p class="font-semibold capitalize">${feed.area.replace('_', ' ')}</p></div>
-                </div>
-                <div class="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                    📍 ${feed.location.lat.toFixed(4)}, ${feed.location.lng.toFixed(4)}
-                </div>
-            </div>
-          `);
-
-        new maptilersdk.Marker({ 
-            element: el,
-            color: alertLevelConfig[feed.alert_level].markerColor 
-        })
-        .setLngLat([feed.location.lng, feed.location.lat])
-        .setPopup(popup)
-        .addTo(map.current!);
+      const newMarker = new maptilersdk.Marker({ 
+          element: el,
+          color: alertLevelConfig[feed.alert_level].markerColor 
+      })
+      .setLngLat([feed.location.lng, feed.location.lat])
+      .setPopup(popup)
+      .addTo(map.current!);
+      
+      markers.current.push(newMarker);
     });
-
-  }, [feeds, lat, lng, zoom, apiKey]);
+  }, [feeds]);
 
   if (!apiKey) {
     return (
@@ -169,10 +182,11 @@ export default function MapViewPage() {
   const [isOnline, setIsOnline] = useState(true);
 
   const fetchFeeds = async () => {
+    // Keep loading state true on subsequent fetches to show loading indicator.
+    setLoading(true); 
+    setError(null);
+    
     try {
-      setLoading(true);
-      setError(null);
-      
       const response = await fetch('http://localhost:5000/api/feeds');
       
       if (!response.ok) {
@@ -207,10 +221,13 @@ export default function MapViewPage() {
 
   // Group feeds by alert level for legend
   const feedsByAlertLevel = feedsArray.reduce((acc, feed) => {
-    if (!acc[feed.alert_level]) acc[feed.alert_level] = [];
-    acc[feed.alert_level].push(feed);
+    const level = feed.alert_level;
+    if (!acc[level]) {
+      acc[level] = [];
+    }
+    acc[level].push(feed);
     return acc;
-  }, {} as Record<string, typeof feedsArray>);
+  }, {} as Record<string, FeedLocation[]>);
 
   const formatTimestamp = (timestamp: string) => {
     if(!timestamp) return 'N/A';
@@ -254,7 +271,7 @@ export default function MapViewPage() {
           </div>
         </div>
 
-        {error && (
+        {error && !loading && (
           <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
             <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
               <AlertTriangle className="h-4 w-4" />
@@ -276,7 +293,7 @@ export default function MapViewPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {loading && feedsArray.length === 0 ? (
               <div className="aspect-video w-full bg-muted rounded-lg flex items-center justify-center">
                 <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
               </div>
@@ -296,7 +313,7 @@ export default function MapViewPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {Object.entries(alertLevelConfig).map(([level, config]) => {
-              const count = feedsByAlertLevel[level as keyof typeof feedsByAlertLevel]?.length || 0;
+              const count = (feedsByAlertLevel[level as keyof typeof feedsByAlertLevel] || []).length;
               const Icon = config.icon;
               return (
                 <div key={level} className="flex items-center justify-between">
@@ -322,12 +339,12 @@ export default function MapViewPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {loading ? (
+            {loading && feedsArray.length === 0 ? (
               <div className="text-center py-4">
                 <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                 <p className="text-sm text-muted-foreground mt-2">Loading feeds...</p>
               </div>
-            ) : feedsArray.length === 0 ? (
+            ) : feedsArray.length === 0 && !loading ? (
               <div className="text-center py-4">
                 <AlertTriangle className="h-6 w-6 text-yellow-500 mx-auto" />
                 <p className="text-sm text-muted-foreground mt-2">No feeds available</p>
