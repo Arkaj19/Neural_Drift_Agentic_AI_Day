@@ -37,9 +37,10 @@ interface UserProfile {
 interface GrievanceFormProps {
   type: 'Medical Attention' | 'Missing Person' | 'General Grievance';
   onSuccess: () => void;
+  userEmail: string | null;
 }
 
-function GrievanceForm({ type, onSuccess }: GrievanceFormProps) {
+function GrievanceForm({ type, onSuccess, userEmail }: GrievanceFormProps) {
   const [details, setDetails] = useState('');
   const [personName, setPersonName] = useState('');
   const [lastSeen, setLastSeen] = useState('');
@@ -50,14 +51,23 @@ function GrievanceForm({ type, onSuccess }: GrievanceFormProps) {
     e.preventDefault();
     setLoading(true);
 
+    if (!userEmail) {
+        toast({
+            title: "Submission Failed",
+            description: "Could not identify the user. Please make sure you are logged in.",
+            variant: "destructive",
+        });
+        setLoading(false);
+        return;
+    }
+
     try {
       let grievanceData: any = {
         type,
         details,
         status: 'new',
         submittedAt: serverTimestamp(),
-        // In a real app with auth, you'd get the user's email from their session
-        submittedBy: 'testuser@example.com',
+        submittedBy: userEmail,
       };
 
       if (type === 'Missing Person') {
@@ -111,7 +121,7 @@ function GrievanceForm({ type, onSuccess }: GrievanceFormProps) {
         </Label>
         <Textarea id="details" value={details} onChange={(e) => setDetails(e.target.value)} required />
       </div>
-      <Button type="submit" disabled={loading} className="w-full">
+      <Button type="submit" disabled={loading || !userEmail} className="w-full">
         {loading ? 'Submitting...' : 'Submit Report'}
       </Button>
     </form>
@@ -184,32 +194,7 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
   );
 }
 
-function UserProfileDisplay() {
-    const [user, setUser] = useState<UserProfile | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                // In a real app, you'd get the currently authenticated user.
-                // For this demo, we'll fetch the first user from the collection.
-                const q = query(collection(db, "users"), limit(1));
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    const userDoc = querySnapshot.docs[0];
-                    const userData = userDoc.data() as Omit<UserProfile, 'id'>;
-                    setUser({ id: userDoc.id, ...userData });
-                }
-            } catch (error) {
-                console.error("Error fetching user profile:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchUser();
-    }, []);
-
+function UserProfileDisplay({ user, loading }: { user: UserProfile | null, loading: boolean }) {
     if (loading) {
         return <Skeleton className="h-24 w-full mb-6" />;
     }
@@ -259,21 +244,41 @@ function UserProfileDisplay() {
 export default function UserDashboardPage() {
   const [formKey, setFormKey] = useState(0); 
   const [missingPersonReports, setMissingPersonReports] = useState<Grievance[]>([]);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, "grievances"), where("type", "==", "Missing Person"), where("status", "==", "new"));
-    
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const fetchUser = async () => {
+        try {
+            // In a real app, you'd get the currently authenticated user.
+            // For this demo, we'll fetch the first user from the collection.
+            const q = query(collection(db, "users"), limit(1));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                const userDoc = querySnapshot.docs[0];
+                const userData = userDoc.data() as Omit<UserProfile, 'id'>;
+                setUser({ id: userDoc.id, ...userData });
+            }
+        } catch (error) {
+            console.error("Error fetching user profile:", error);
+        } finally {
+            setLoadingUser(false);
+        }
+    };
+    fetchUser();
+
+    const qGrievances = query(collection(db, "grievances"), where("type", "==", "Missing Person"), where("status", "==", "new"));
+    const unsubscribeGrievances = onSnapshot(qGrievances, (querySnapshot) => {
       const reports = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grievance));
       setMissingPersonReports(reports);
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeGrievances();
   }, []);
 
   return (
     <div className="space-y-4">
-        <UserProfileDisplay />
+        <UserProfileDisplay user={user} loading={loadingUser} />
         <MissingPersonsCarousel reports={missingPersonReports} />
 
         <h1 className="text-3xl font-bold">User Dashboard</h1>
@@ -287,7 +292,7 @@ export default function UserDashboardPage() {
                     <CardDescription>Request immediate medical assistance.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <GrievanceForm key={`medical-${formKey}`} type="Medical Attention" onSuccess={() => setFormKey(k => k + 1)} />
+                    <GrievanceForm key={`medical-${formKey}`} type="Medical Attention" onSuccess={() => setFormKey(k => k + 1)} userEmail={user?.email || null} />
                 </CardContent>
             </Card>
              <Card>
@@ -298,7 +303,7 @@ export default function UserDashboardPage() {
                     <CardDescription>Report a person who is missing.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <GrievanceForm key={`missing-${formKey}`} type="Missing Person" onSuccess={() => setFormKey(k => k + 1)} />
+                    <GrievanceForm key={`missing-${formKey}`} type="Missing Person" onSuccess={() => setFormKey(k => k + 1)} userEmail={user?.email || null} />
                 </CardContent>
             </Card>
              <Card>
@@ -309,7 +314,7 @@ export default function UserDashboardPage() {
                     <CardDescription>Report any other issues (e.g., lost item, safety concern).</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <GrievanceForm key={`general-${formKey}`} type="General Grievance" onSuccess={() => setFormKey(k => k + 1)} />
+                    <GrievanceForm key={`general-${formKey}`} type="General Grievance" onSuccess={() => setFormKey(k => k + 1)} userEmail={user?.email || null} />
                 </CardContent>
             </Card>
         </div>
