@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,15 +14,50 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import { Icons } from '@/components/icons';
+import { db } from '@/lib/firebase';
+import { collection, addDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SignUpPage() {
   const router = useRouter();
+  const { toast } = useToast();
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, you'd handle user creation here.
-    // For the demo, we'll just redirect to login.
-    router.push('/login');
+    setLoading(true);
+
+    try {
+      // In a real app, you would also handle Firebase Auth user creation here.
+      // For this implementation, we are just saving the user data to Firestore.
+      await addDoc(collection(db, 'users'), {
+        fullName,
+        email,
+        phone,
+        createdAt: new Date(),
+      });
+
+      toast({
+        title: 'Account Created',
+        description: "We've created your account for you.",
+      });
+
+      router.push('/login');
+
+    } catch (error) {
+      console.error('Error signing up:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create account. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -39,23 +75,54 @@ export default function SignUpPage() {
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name</Label>
-                <Input id="fullName" type="text" placeholder="John Doe" required />
+                <Input 
+                  id="fullName" 
+                  type="text" 
+                  placeholder="John Doe" 
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required 
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="john.doe@email.com" required />
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="john.doe@email.com" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required 
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" required />
+                <Input 
+                  id="password" 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required 
+                />
               </div>
                <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" type="tel" placeholder="+1 234 567 890" required />
+                <Input 
+                  id="phone" 
+                  type="tel" 
+                  placeholder="+1 234 567 890" 
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required 
+                />
               </div>
-              <Button type="submit" className="w-full text-lg font-semibold" size="lg">
-                <UserPlus className="mr-2 h-5 w-5" />
-                Sign Up
+              <Button type="submit" className="w-full text-lg font-semibold" size="lg" disabled={loading}>
+                {loading ? 'Signing Up...' : (
+                  <>
+                    <UserPlus className="mr-2 h-5 w-5" />
+                    Sign Up
+                  </>
+                )}
               </Button>
               <Button variant="link" size="sm" className="w-full" onClick={() => router.push('/')}>
                 Back to Home
