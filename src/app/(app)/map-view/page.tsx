@@ -1,6 +1,6 @@
 
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,6 +23,8 @@ import {
   Wifi,
   WifiOff
 } from "lucide-react";
+import * as maptilersdk from '@maptiler/sdk';
+import '@maptiler/sdk/dist/maptiler-sdk.css';
 
 interface FeedLocation {
   feed_id: string;
@@ -50,19 +52,22 @@ const alertLevelConfig = {
     color: "bg-red-500",
     textColor: "text-red-400",
     icon: Zap,
-    label: "Critical Alert"
+    label: "Critical Alert",
+    markerColor: "#f54242"
   },
   warning: {
     color: "bg-yellow-500", 
     textColor: "text-yellow-400",
     icon: AlertTriangle,
-    label: "Warning"
+    label: "Warning",
+    markerColor: "#f5a742"
   },
   normal: {
     color: "bg-green-500",
     textColor: "text-green-400", 
     icon: TrendingUp,
-    label: "Normal"
+    label: "Normal",
+    markerColor: "#42f54b"
   }
 };
 
@@ -77,158 +82,82 @@ const getProgressColor = (capacity: number) => {
 };
 
 // Interactive Map Component
-const InteractiveMap = ({ feeds, selectedFeed, onFeedSelect }: {
+const InteractiveMap = ({ feeds }: {
   feeds: FeedLocation[];
-  selectedFeed: string | null;
-  onFeedSelect: (feedId: string | null) => void;
 }) => {
-  const [mapCenter, setMapCenter] = useState({ lat: 28.6141, lng: 77.2092 });
-  const [zoom, setZoom] = useState(16);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<maptilersdk.Map | null>(null);
+  const [lng] = useState(77.6353);
+  const [lat] = useState(12.9667);
+  const [zoom] = useState(14);
+  const apiKey = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
 
-  // Calculate map bounds
   useEffect(() => {
-    if (feeds.length > 0) {
-      const lats = feeds.map(f => f.location.lat);
-      const lngs = feeds.map(f => f.location.lng);
-      
-      const centerLat = (Math.max(...lats) + Math.min(...lats)) / 2;
-      const centerLng = (Math.max(...lngs) + Math.min(...lngs)) / 2;
-      
-      setMapCenter({ lat: centerLat, lng: centerLng });
+    if (!apiKey) {
+      console.error("MapTiler API key is missing. Please add it to your .env file.");
+      return;
     }
-  }, [feeds]);
+
+    if (map.current || !mapContainer.current) return;
+
+    maptilersdk.config.apiKey = apiKey;
+
+    map.current = new maptilersdk.Map({
+      container: mapContainer.current,
+      style: maptilersdk.MapStyle.STREET,
+      center: [lng, lat],
+      zoom: zoom
+    });
+    
+    feeds.forEach(feed => {
+        const { color } = alertLevelConfig[feed.alert_level];
+        const el = document.createElement('div');
+        el.className = `p-2 rounded-full shadow-lg border-2 border-white ${color}`;
+        el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
+
+
+        const popup = new maptilersdk.Popup({ closeButton: false, offset: 25 })
+          .setHTML(`
+            <div class="p-2 bg-card text-card-foreground rounded-lg shadow-xl border min-w-56">
+                <h4 class="font-semibold text-base mb-2 text-center">${feed.name}</h4>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div><p class="text-muted-foreground">Count</p><p class="font-semibold">${feed.current_count}/${feed.max_capacity}</p></div>
+                    <div><p class="text-muted-foreground">Density</p><p class="font-semibold">${feed.density_percentage}%</p></div>
+                    <div><p class="text-muted-foreground">Status</p><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${feed.alert_level === 'critical' ? 'bg-destructive text-destructive-foreground' : feed.alert_level === 'warning' ? 'bg-yellow-500 text-black' : 'bg-secondary text-secondary-foreground'}">${alertLevelConfig[feed.alert_level].label}</span></div>
+                    <div><p class="text-muted-foreground">Area</p><p class="font-semibold capitalize">${feed.area.replace('_', ' ')}</p></div>
+                </div>
+                <div class="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                    📍 ${feed.location.lat.toFixed(4)}, ${feed.location.lng.toFixed(4)}
+                </div>
+            </div>
+          `);
+
+        new maptilersdk.Marker({ 
+            element: el,
+            color: alertLevelConfig[feed.alert_level].markerColor 
+        })
+        .setLngLat([feed.location.lng, feed.location.lat])
+        .setPopup(popup)
+        .addTo(map.current!);
+    });
+
+  }, [feeds, lat, lng, zoom, apiKey]);
+
+  if (!apiKey) {
+    return (
+        <div className="aspect-video w-full bg-muted rounded-lg flex flex-col items-center justify-center text-center p-4">
+            <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+            <h3 className="text-xl font-semibold mb-2">MapTiler API Key Missing</h3>
+            <p className="text-muted-foreground">
+                Please add your <code className="bg-muted-foreground/20 px-1 py-0.5 rounded">NEXT_PUBLIC_MAPTILER_API_KEY</code> to your <code className="bg-muted-foreground/20 px-1 py-0.5 rounded">.env</code> file.
+            </p>
+        </div>
+    )
+  }
 
   return (
-    <div className="aspect-video w-full bg-slate-100 dark:bg-slate-800 rounded-lg relative overflow-hidden">
-      {/* OpenStreetMap-style background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-green-50 via-blue-50 to-yellow-50 dark:from-slate-700 dark:to-slate-600">
-        
-        {/* Map Grid */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="w-full h-full grid grid-cols-12 grid-rows-8 border border-slate-400">
-            {Array.from({length: 96}).map((_, i) => (
-              <div key={i} className="border border-slate-300"></div>
-            ))}
-          </div>
-        </div>
-
-        {/* Streets simulation */}
-        <div className="absolute inset-0">
-          <div className="absolute top-1/3 left-0 right-0 h-2 bg-gray-300 dark:bg-gray-600 opacity-60"></div>
-          <div className="absolute bottom-1/3 left-0 right-0 h-2 bg-gray-300 dark:bg-gray-600 opacity-60"></div>
-          <div className="absolute top-0 bottom-0 left-1/4 w-2 bg-gray-300 dark:bg-gray-600 opacity-60"></div>
-          <div className="absolute top-0 bottom-0 right-1/4 w-2 bg-gray-300 dark:bg-gray-600 opacity-60"></div>
-        </div>
-
-        {/* Feed Location Markers */}
-        <div className="absolute inset-4">
-          {feeds.map((feed, index) => {
-            const alertConfig = alertLevelConfig[feed.alert_level];
-            
-            // Convert lat/lng to pixel position (simplified projection)
-            const relativeX = ((feed.location.lng - mapCenter.lng) * 100000) + 50;
-            const relativeY = 50 - ((feed.location.lat - mapCenter.lat) * 100000);
-            
-            // Ensure markers stay within bounds
-            const x = Math.max(5, Math.min(95, relativeX));
-            const y = Math.max(5, Math.min(95, relativeY));
-            
-            return (
-              <div
-                key={feed.feed_id}
-                className={cn(
-                  "absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-300",
-                  selectedFeed === feed.feed_id ? "scale-125 z-20" : "hover:scale-110 z-10"
-                )}
-                style={{ left: `${x}%`, top: `${y}%` }}
-                onClick={() => onFeedSelect(selectedFeed === feed.feed_id ? null : feed.feed_id)}
-              >
-                {/* Marker */}
-                <div className={cn("relative p-3 rounded-full shadow-lg border-2 border-white", alertConfig.color)}>
-                  <MapPin className="h-6 w-6 text-white" />
-                  
-                  {/* Critical alert animation */}
-                  {feed.alert_level === 'critical' && (
-                    <>
-                      <div className="absolute -top-1 -right-1 h-4 w-4 bg-red-600 rounded-full animate-pulse">
-                        <div className="h-full w-full bg-red-400 rounded-full animate-ping"></div>
-                      </div>
-                      <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-25"></div>
-                    </>
-                  )}
-                  
-                  {/* Count badge */}
-                  <div className="absolute -bottom-2 -right-2 bg-white dark:bg-slate-800 text-xs font-bold px-2 py-1 rounded-full border shadow-sm">
-                    {feed.current_count}
-                  </div>
-                </div>
-                
-                {/* Info popup */}
-                {selectedFeed === feed.feed_id && (
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 bg-white dark:bg-slate-800 p-4 rounded-lg shadow-xl border min-w-64 z-30">
-                    <div className="text-center">
-                      <h4 className="font-semibold text-base mb-2">{feed.name}</h4>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="text-left">
-                          <p className="text-muted-foreground">Count</p>
-                          <p className="font-semibold">{feed.current_count}/{feed.max_capacity}</p>
-                        </div>
-                        <div className="text-left">
-                          <p className="text-muted-foreground">Density</p>
-                          <p className="font-semibold">{feed.density_percentage}%</p>
-                        </div>
-                        <div className="text-left">
-                          <p className="text-muted-foreground">Status</p>
-                          <Badge variant={
-                            feed.alert_level === 'critical' ? 'destructive' : 
-                            feed.alert_level === 'warning' ? 'default' : 'secondary'
-                          } className="text-xs">
-                            {alertConfig.label}
-                          </Badge>
-                        </div>
-                        <div className="text-left">
-                          <p className="text-muted-foreground">Area</p>
-                          <p className="font-semibold capitalize">{feed.area.replace('_', ' ')}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 pt-2 border-t text-xs text-muted-foreground">
-                        📍 {feed.location.lat.toFixed(4)}, {feed.location.lng.toFixed(4)}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Map controls */}
-        <div className="absolute top-4 left-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-2 flex flex-col gap-1">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setZoom(Math.min(20, zoom + 1))}
-            className="h-8 w-8 p-0"
-          >
-            +
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setZoom(Math.max(10, zoom - 1))}
-            className="h-8 w-8 p-0"
-          >
-            -
-          </Button>
-        </div>
-
-        {/* Scale and coordinates */}
-        <div className="absolute bottom-2 right-2 text-xs text-muted-foreground bg-white/90 dark:bg-black/90 px-3 py-2 rounded-lg">
-          <div>Scale: 1:{Math.round(1000 / zoom * 100)}m</div>
-          <div>Center: {mapCenter.lat.toFixed(4)}, {mapCenter.lng.toFixed(4)}</div>
-          <div>Zoom: {zoom}</div>
-        </div>
-      </div>
+    <div className="aspect-video w-full relative rounded-lg overflow-hidden">
+      <div ref={mapContainer} className="absolute inset-0" />
     </div>
   );
 };
@@ -246,7 +175,7 @@ export default function MapViewPage() {
       setError(null);
       setLoading(true);
       
-      const response = await fetch('/api/feeds');
+      const response = await fetch('http://localhost:5000/api/feeds');
       
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
@@ -360,8 +289,6 @@ export default function MapViewPage() {
             ) : (
               <InteractiveMap 
                 feeds={feedsArray}
-                selectedFeed={selectedFeed}
-                onFeedSelect={setSelectedFeed}
               />
             )}
           </CardContent>
@@ -442,40 +369,7 @@ export default function MapViewPage() {
             )}
           </CardContent>
         </Card>
-
-        {selectedFeed && (
-          <Card className="border-blue-500">
-            <CardHeader>
-              <CardTitle className="text-base">Selected Feed Details</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm space-y-2">
-              {(() => {
-                const feed = feeds[selectedFeed];
-                if (!feed) return null;
-                return (
-                  <>
-                    <div><strong>Name:</strong> {feed.name}</div>
-                    <div><strong>Location:</strong> {feed.location.lat.toFixed(6)}, {feed.location.lng.toFixed(6)}</div>
-                    <div><strong>Area:</strong> {feed.area.replace('_', ' ')}</div>
-                    <div><strong>Capacity:</strong> {feed.current_count}/{feed.max_capacity}</div>
-                    <div><strong>Density:</strong> {feed.density_percentage}%</div>
-                    <div><strong>Status:</strong> 
-                      <Badge className="ml-2" variant={
-                        feed.alert_level === 'critical' ? 'destructive' : 
-                        feed.alert_level === 'warning' ? 'default' : 'secondary'
-                      }>
-                        {feed.alert_level.toUpperCase()}
-                      </Badge>
-                    </div>
-                  </>
-                );
-              })()}
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );
 }
-
-    
