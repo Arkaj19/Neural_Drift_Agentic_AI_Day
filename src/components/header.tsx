@@ -1,5 +1,8 @@
 import { Icons } from "./icons";
 import Clock from "./clock";
+import { Button } from "./ui/button";
+import { LogOut } from "lucide-react";
+import Link from "next/link";
 
 export default function Header() {
   return (
@@ -18,6 +21,12 @@ export default function Header() {
             <span className="text-sm text-muted-foreground hidden md:block">System Online</span>
           </div>
           <Clock />
+           <Button variant="outline" size="sm" asChild>
+            <Link href="/">
+              <LogOut className="mr-2 h-4 w-4" />
+              Log Out
+            </Link>
+          </Button>
         </div>
       </div>
     </header>
