@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Video, Map, AlertTriangle, LayoutDashboard } from "lucide-react";
+import { Video, Map, AlertTriangle, LayoutDashboard, MessageSquareWarning } from "lucide-react";
 
 const routes = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/live-feed", label: "Live Feed", icon: Video },
   { href: "/map-view", label: "Map View", icon: Map },
   { href: "/alerts", label: "Alerts", icon: AlertTriangle },
+  { href: "/grievances", label: "Grievances", icon: MessageSquareWarning },
 ];
 
 export default function MainNav() {
