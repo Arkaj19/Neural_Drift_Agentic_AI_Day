@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs, limit, getDocsFromCache } from 'firebase/firestore';
 import type { Grievance } from '@/app/(app)/grievances/page';
 import {
   Carousel,
@@ -191,12 +191,14 @@ function UserProfileDisplay() {
     useEffect(() => {
         const fetchUser = async () => {
             try {
-                // Using the hardcoded email as we don't have auth state
-                const q = query(collection(db, "users"), where("email", "==", "testuser@example.com"), limit(1));
+                // In a real app, you'd get the currently authenticated user.
+                // For this demo, we'll fetch the first user from the collection.
+                const q = query(collection(db, "users"), limit(1));
                 const querySnapshot = await getDocs(q);
                 if (!querySnapshot.empty) {
-                    const userData = querySnapshot.docs[0].data() as Omit<UserProfile, 'id'>;
-                    setUser({ id: querySnapshot.docs[0].id, ...userData });
+                    const userDoc = querySnapshot.docs[0];
+                    const userData = userDoc.data() as Omit<UserProfile, 'id'>;
+                    setUser({ id: userDoc.id, ...userData });
                 }
             } catch (error) {
                 console.error("Error fetching user profile:", error);
@@ -213,10 +215,17 @@ function UserProfileDisplay() {
     }
 
     if (!user) {
-        return null;
+        return (
+            <Card className="mb-6">
+                <CardContent className="p-4 text-center text-muted-foreground">
+                    No user profile found. Please sign up to create a profile.
+                </CardContent>
+            </Card>
+        );
     }
 
     const getInitials = (name: string) => {
+        if (!name) return '';
         return name.split(' ').map(n => n[0]).join('').toUpperCase();
     }
 
