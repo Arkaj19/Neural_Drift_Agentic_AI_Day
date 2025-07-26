@@ -6,15 +6,17 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Mail, Phone, AlertTriangle, Image as ImageIcon, X, Bell, BellRing, Send, Bot, User } from "lucide-react";
+import { Mail, Phone, AlertTriangle, Image as ImageIcon, X, Bell, BellRing } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, where, getDocs, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, getDocs, limit, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import type { Grievance } from '@/app/(app)/grievances/page';
 import {
   Carousel,
@@ -26,8 +28,17 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { grievanceChatbot } from '@/ai/flows/grievance-chatbot';
-
+import { createGrievance } from '@/services/grievance-service';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
 
 export interface UserProfile {
     id: string;
@@ -43,11 +54,6 @@ interface Notification {
     seconds: number;
   };
   read: boolean;
-}
-
-interface ChatMessage {
-    role: 'user' | 'model';
-    content: string;
 }
 
 function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
@@ -237,114 +243,190 @@ function Notifications({ user }: { user: UserProfile | null }) {
   );
 }
 
-function GrievanceChatbot({ user }: { user: UserProfile }) {
-    const [messages, setMessages] = useState<ChatMessage[]>([
-        { role: 'model', content: "Hello! I'm the Drishti AI assistant. How can I help you today? You can report a medical issue, a missing person, or any other concern." }
-    ]);
-    const [input, setInput] = useState('');
+function GrievanceForm({ user }: { user: UserProfile | null }) {
+    const { toast } = useToast();
     const [loading, setLoading] = useState(false);
+
+    // State for Medical Attention
+    const [medicalDetails, setMedicalDetails] = useState('');
+    const [medicalLocation, setMedicalLocation] = useState('');
+
+    // State for Missing Person
+    const [personName, setPersonName] = useState('');
+    const [lastSeen, setLastSeen] = useState('');
+    const [missingDetails, setMissingDetails] = useState('');
+    const [photo, setPhoto] = useState<File | null>(null);
+    const [photoPreview, setPhotoPreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
-
-    const handleSendMessage = async (e: React.FormEvent, messageContent?: string) => {
-        e.preventDefault();
-        const content = messageContent || input;
-        if (!content.trim() || loading) return;
-
-        const newUserMessage: ChatMessage = { role: 'user', content };
-        setMessages(prev => [...prev, newUserMessage]);
-        setInput('');
-        setLoading(true);
-
-        try {
-            const response = await grievanceChatbot({
-                history: [...messages, newUserMessage],
-                user: { fullName: user.fullName, email: user.email }
-            });
-            setMessages(prev => [...prev, { role: 'model', content: response }]);
-        } catch (error) {
-            console.error("Error with chatbot:", error);
-            setMessages(prev => [...prev, { role: 'model', content: "I'm sorry, I encountered an error. Please try again." }]);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // State for General Grievance
+    const [generalDetails, setGeneralDetails] = useState('');
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            setPhoto(file);
             const reader = new FileReader();
             reader.onloadend = () => {
-                const photoDataUri = reader.result as string;
-                const messageWithPhoto = `Here is the photo: [image attached]`;
-                handleSendMessage(e, messageWithPhoto + `\n${photoDataUri}`);
+                setPhotoPreview(reader.result as string);
             };
             reader.readAsDataURL(file);
         }
     };
 
+    const handleSubmit = async (
+        type: Grievance['type'],
+        details: Record<string, any>
+    ) => {
+        if (!user) {
+            toast({ title: "Error", description: "You must be logged in to submit a grievance.", variant: "destructive" });
+            return;
+        }
+        setLoading(true);
+
+        try {
+            await createGrievance({
+                type,
+                submittedBy: user.fullName,
+                email: user.email,
+                ...details
+            });
+
+            toast({
+                title: "Grievance Submitted",
+                description: `Your report for "${type}" has been received.`,
+            });
+            // Reset forms
+            setMedicalDetails('');
+            setMedicalLocation('');
+            setPersonName('');
+            setLastSeen('');
+            setMissingDetails('');
+            setPhoto(null);
+            setPhotoPreview(null);
+            setGeneralDetails('');
+
+        } catch (error) {
+            console.error("Error submitting grievance:", error);
+            toast({ title: "Error", description: "Failed to submit grievance. Please try again.", variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!user) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Please Log In</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p>You must be logged in to report an issue.</p>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Bot /> AI Assistant
-                </CardTitle>
-                <CardDescription>Report an issue by chatting with our AI assistant.</CardDescription>
+        <div>
+            <CardHeader className="px-0">
+                <CardTitle>Report an Issue</CardTitle>
+                <CardDescription>
+                    Use the forms below to report a medical emergency, a missing person, or a general concern.
+                </CardDescription>
             </CardHeader>
-            <CardContent>
-                <div className="h-[400px] overflow-y-auto p-4 border rounded-md mb-4 bg-muted/20 space-y-4">
-                    {messages.map((msg, index) => (
-                        <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            {msg.role === 'model' && <Avatar className="w-8 h-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>}
-                            <div className={`rounded-lg px-4 py-2 max-w-[80%] ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>
-                                <p className="text-sm">{msg.content.split('\n')[0]}</p>
+            <div className="grid md:grid-cols-3 gap-6">
+                {/* Medical Attention */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Medical Attention</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            handleSubmit('Medical Attention', { details: medicalDetails, location: medicalLocation });
+                        }} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="medical-location">Your Location</Label>
+                                <Input id="medical-location" placeholder="e.g., Near Stage B" value={medicalLocation} onChange={(e) => setMedicalLocation(e.target.value)} required />
                             </div>
-                            {msg.role === 'user' && <Avatar className="w-8 h-8"><AvatarFallback><User /></AvatarFallback></Avatar>}
-                        </div>
-                    ))}
-                    {loading && (
-                        <div className="flex items-start gap-3 justify-start">
-                             <Avatar className="w-8 h-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>
-                             <div className="rounded-lg px-4 py-2 max-w-[80%] bg-background">
-                                <Skeleton className="h-4 w-24" />
+                            <div className="space-y-2">
+                                <Label htmlFor="medical-details">Details of Emergency</Label>
+                                <Textarea id="medical-details" placeholder="Describe the situation" value={medicalDetails} onChange={(e) => setMedicalDetails(e.target.value)} required />
                             </div>
-                        </div>
-                    )}
-                    <div ref={messagesEndRef} />
-                </div>
-                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                    <Input
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Type your message..."
-                        disabled={loading}
-                    />
-                     <Button type="button" variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={loading}>
-                        <ImageIcon className="h-4 w-4" />
-                        <span className="sr-only">Upload Image</span>
-                    </Button>
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handlePhotoChange}
-                        className="hidden"
-                        accept="image/*"
-                    />
-                    <Button type="submit" disabled={loading}>
-                        <Send className="h-4 w-4" />
-                    </Button>
-                </form>
-            </CardContent>
-        </Card>
+                            <Button type="submit" disabled={loading} className="w-full">Submit Medical Report</Button>
+                        </form>
+                    </CardContent>
+                </Card>
+
+                {/* Missing Person */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Missing Person</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                         <form onSubmit={(e) => {
+                            e.preventDefault();
+                            handleSubmit('Missing Person', {
+                                personName,
+                                lastSeen,
+                                details: missingDetails,
+                                photoFile: photo
+                            });
+                        }} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="person-name">Missing Person's Name</Label>
+                                <Input id="person-name" value={personName} onChange={e => setPersonName(e.target.value)} required />
+                            </div>
+                             <div className="space-y-2">
+                                <Label htmlFor="last-seen">Last Seen Location & Time</Label>
+                                <Input id="last-seen" value={lastSeen} onChange={e => setLastSeen(e.target.value)} required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="missing-details">Description (clothing, etc.)</Label>
+                                <Textarea id="missing-details" value={missingDetails} onChange={e => setMissingDetails(e.target.value)} required />
+                            </div>
+                             <div className="space-y-2">
+                                <Label>Photo (Optional)</Label>
+                                {photoPreview && (
+                                    <div className="relative w-24 h-24">
+                                        <Image src={photoPreview} alt="Preview" layout="fill" objectFit="cover" className="rounded-md" />
+                                        <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => { setPhoto(null); setPhotoPreview(null); }}>
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                )}
+                                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                                    <ImageIcon className="mr-2 h-4 w-4" />
+                                    {photo ? "Change Photo" : "Upload Photo"}
+                                </Button>
+                                <Input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoChange} />
+                            </div>
+                            <Button type="submit" disabled={loading} className="w-full">Submit Missing Person Report</Button>
+                        </form>
+                    </CardContent>
+                </Card>
+
+                {/* General Grievance */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>General Grievance</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            handleSubmit('General Grievance', { details: generalDetails });
+                        }} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="general-details">Describe your concern</Label>
+                                <Textarea id="general-details" className="h-52" placeholder="Please provide as much detail as possible." value={generalDetails} onChange={(e) => setGeneralDetails(e.target.value)} required />
+                            </div>
+                             <Button type="submit" disabled={loading} className="w-full">Submit General Grievance</Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
     );
 }
 
@@ -397,26 +479,7 @@ export default function UserDashboardPage() {
         <UserProfileDisplay user={user} loading={loadingUser} />
         <Notifications user={user} />
         <MissingPersonsCarousel reports={missingPersonReports} />
-        
-        {loadingUser ? (
-            <Card>
-                <CardContent className="p-6">
-                    <Skeleton className="h-96 w-full" />
-                </CardContent>
-            </Card>
-        ) : user ? (
-            <GrievanceChatbot user={user} />
-        ) : (
-             <Card>
-                <CardHeader>
-                    <CardTitle>Please Log In</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p>You must be logged in to report an issue.</p>
-                </CardContent>
-            </Card>
-        )}
+        <GrievanceForm user={user} />
     </div>
   );
 }
-
