@@ -154,18 +154,22 @@ export default function GrievancesPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {grievance.photoDataUri && (
-                    <div className="relative aspect-video w-full mb-4 rounded-md overflow-hidden">
-                       <Image src={grievance.photoDataUri} alt={grievance.personName || 'Missing person'} layout="fill" objectFit="cover" />
+                    <div className="flex gap-4">
+                        {grievance.photoDataUri && (
+                            <div className="relative h-24 w-24 flex-shrink-0 rounded-md overflow-hidden">
+                                <Image src={grievance.photoDataUri} alt={grievance.personName || 'Missing person'} layout="fill" objectFit="cover" />
+                            </div>
+                        )}
+                        <div className="flex-grow">
+                            {grievance.type === 'Missing Person' && (
+                                <div className="space-y-2 text-sm">
+                                <p><strong>Name:</strong> {grievance.personName}</p>
+                                <p><strong>Last Seen:</strong> {grievance.lastSeen}</p>
+                                </div>
+                            )}
+                            <p className="text-sm text-muted-foreground mt-2">{grievance.details}</p>
+                        </div>
                     </div>
-                   )}
-                  {grievance.type === 'Missing Person' && (
-                    <div className="space-y-2 text-sm">
-                      <p><strong>Name:</strong> {grievance.personName}</p>
-                      <p><strong>Last Seen:</strong> {grievance.lastSeen}</p>
-                    </div>
-                  )}
-                  <p className="text-sm text-muted-foreground mt-2">{grievance.details}</p>
                 </CardContent>
               </Card>
             )
