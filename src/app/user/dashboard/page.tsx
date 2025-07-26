@@ -9,14 +9,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { User, Search, Stethoscope, MessageSquareWarning, AlertTriangle, Mail, Phone, UserCircle, Image as ImageIcon, X, Bell, BellRing } from "lucide-react";
+import { Mail, Phone, AlertTriangle, Image as ImageIcon, X, Bell, BellRing, Send, Bot, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, getDocs, limit, doc, updateDoc } from 'firebase/firestore';
 import type { Grievance } from '@/app/(app)/grievances/page';
 import {
   Carousel,
@@ -27,9 +25,8 @@ import {
 } from "@/components/ui/carousel";
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { grievanceChatbot } from '@/ai/flows/grievance-chatbot';
 
 
 export interface UserProfile {
@@ -48,244 +45,9 @@ interface Notification {
   read: boolean;
 }
 
-interface GrievanceFormProps {
-  type: 'Medical Attention' | 'Missing Person' | 'General Grievance';
-  onSuccess: () => void;
-  user: UserProfile | null;
-}
-
-function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
-  const [details, setDetails] = useState('');
-  const [personName, setPersonName] = useState('');
-  const [lastSeenLocation, setLastSeenLocation] = useState('');
-  const [lastSeenHour, setLastSeenHour] = useState('12');
-  const [lastSeenMinute, setLastSeenMinute] = useState('00');
-  const [location, setLocation] = useState('');
-  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
-  const [loadingLocations, setLoadingLocations] = useState(false);
-  const [photoDataUri, setPhotoDataUri] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    if (type === 'Missing Person' || type === 'Medical Attention') {
-      const fetchLocations = async () => {
-        setLoadingLocations(true);
-        try {
-          const response = await fetch('http://localhost:5000/api/feeds');
-          if (!response.ok) throw new Error('Failed to fetch locations');
-          const data = await response.json();
-          const locationData = Object.entries(data.feeds).map(([id, feed]: [string, any]) => ({
-            id: id,
-            name: feed.name,
-          }));
-          setLocations(locationData);
-        } catch (error) {
-          console.error(error);
-          toast({
-            title: "Error",
-            description: "Could not fetch camera locations.",
-            variant: "destructive",
-          });
-        } finally {
-          setLoadingLocations(false);
-        }
-      };
-      fetchLocations();
-    }
-  }, [type, toast]);
-
-
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoDataUri(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-  
-  const clearPhoto = () => {
-    setPhotoDataUri(null);
-    if(fileInputRef.current) {
-        fileInputRef.current.value = "";
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    if (!user || !user.fullName || !user.email) {
-        toast({
-            title: "Submission Failed",
-            description: "Could not identify the user. Please make sure you are logged in.",
-            variant: "destructive",
-        });
-        setLoading(false);
-        return;
-    }
-
-    try {
-      let grievanceData: any = {
-        type,
-        details,
-        status: 'new',
-        submittedAt: serverTimestamp(),
-        submittedBy: user.fullName,
-        email: user.email, // Include user's email
-      };
-
-      if (type === 'Medical Attention') {
-        if (!location) {
-          toast({
-            title: "Missing Information",
-            description: "Please select a location.",
-            variant: "destructive"
-          });
-          setLoading(false);
-          return;
-        }
-        grievanceData = {
-          ...grievanceData,
-          location,
-        };
-      }
-
-      if (type === 'Missing Person') {
-        if (!lastSeenLocation) {
-          toast({
-            title: "Missing Information",
-            description: "Please select a location.",
-            variant: "destructive"
-          });
-          setLoading(false);
-          return;
-        }
-        grievanceData = {
-          ...grievanceData,
-          personName,
-          lastSeen: `${lastSeenLocation} at ${lastSeenHour}:${lastSeenMinute}`,
-          photoDataUri,
-        };
-      }
-
-      await addDoc(collection(db, 'grievances'), grievanceData);
-
-      toast({
-        title: "Report Submitted",
-        description: `Your report for "${type}" has been successfully submitted.`,
-      });
-      onSuccess(); // Clear the form
-      setDetails('');
-      setPersonName('');
-      setLastSeenLocation('');
-      setLastSeenHour('12');
-      setLastSeenMinute('00');
-      setLocation('');
-      clearPhoto();
-
-    } catch (error) {
-      console.error('Error submitting grievance:', error);
-      toast({
-        title: "Submission Failed",
-        description: "There was an error submitting your report. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
-  const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {type === 'Medical Attention' && (
-        <div className="space-y-2">
-            <Label htmlFor="location">Location</Label>
-             <Select value={location} onValueChange={setLocation}>
-                  <SelectTrigger disabled={loadingLocations}>
-                    <SelectValue placeholder={loadingLocations ? "Loading locations..." : "Select a location"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.map(loc => (
-                      <SelectItem key={loc.id} value={loc.name}>{loc.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-        </div>
-      )}
-      {type === 'Missing Person' && (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="personName">Person's Full Name</Label>
-            <Input id="personName" value={personName} onChange={(e) => setPersonName(e.target.value)} required />
-          </div>
-          <div className="space-y-2">
-            <Label>Last Seen</Label>
-            <div className="flex gap-2">
-              <div className="flex-grow">
-                <Select value={lastSeenLocation} onValueChange={setLastSeenLocation}>
-                  <SelectTrigger disabled={loadingLocations}>
-                    <SelectValue placeholder={loadingLocations ? "Loading locations..." : "Select a location"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.map(loc => (
-                      <SelectItem key={loc.id} value={loc.name}>{loc.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex gap-1">
-                <Select value={lastSeenHour} onValueChange={setLastSeenHour}>
-                  <SelectTrigger className="w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-48">
-                    {hours.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                 <Select value={lastSeenMinute} onValueChange={setLastSeenMinute}>
-                  <SelectTrigger className="w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-48">
-                    {minutes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="photo">Photo</Label>
-            <Input id="photo" type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/*" />
-            {photoDataUri && (
-                <div className="mt-2 relative h-32 w-32">
-                    <Image src={photoDataUri} alt="Preview" layout="fill" objectFit="cover" className="rounded-md" />
-                     <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={clearPhoto}>
-                        <X className="h-4 w-4" />
-                     </Button>
-                </div>
-            )}
-          </div>
-        </>
-      )}
-      <div className="space-y-2">
-        <Label htmlFor="details">
-          {type === 'Missing Person' ? 'Additional Details (Description, Clothing, etc.)' : 'Please describe the situation'}
-        </Label>
-        <Textarea id="details" value={details} onChange={(e) => setDetails(e.target.value)} required />
-      </div>
-      <Button type="submit" disabled={loading || !user} className="w-full">
-        {loading ? 'Submitting...' : 'Submit Report'}
-      </Button>
-    </form>
-  );
+interface ChatMessage {
+    role: 'user' | 'model';
+    content: string;
 }
 
 function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
@@ -475,9 +237,118 @@ function Notifications({ user }: { user: UserProfile | null }) {
   );
 }
 
+function GrievanceChatbot({ user }: { user: UserProfile }) {
+    const [messages, setMessages] = useState<ChatMessage[]>([
+        { role: 'model', content: "Hello! I'm the Drishti AI assistant. How can I help you today? You can report a medical issue, a missing person, or any other concern." }
+    ]);
+    const [input, setInput] = useState('');
+    const [loading, setLoading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    const handleSendMessage = async (e: React.FormEvent, messageContent?: string) => {
+        e.preventDefault();
+        const content = messageContent || input;
+        if (!content.trim() || loading) return;
+
+        const newUserMessage: ChatMessage = { role: 'user', content };
+        setMessages(prev => [...prev, newUserMessage]);
+        setInput('');
+        setLoading(true);
+
+        try {
+            const response = await grievanceChatbot({
+                history: [...messages, newUserMessage],
+                user: { fullName: user.fullName, email: user.email }
+            });
+            setMessages(prev => [...prev, { role: 'model', content: response }]);
+        } catch (error) {
+            console.error("Error with chatbot:", error);
+            setMessages(prev => [...prev, { role: 'model', content: "I'm sorry, I encountered an error. Please try again." }]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const photoDataUri = reader.result as string;
+                const messageWithPhoto = `Here is the photo: [image attached]`;
+                handleSendMessage(e, messageWithPhoto + `\n${photoDataUri}`);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Bot /> AI Assistant
+                </CardTitle>
+                <CardDescription>Report an issue by chatting with our AI assistant.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="h-[400px] overflow-y-auto p-4 border rounded-md mb-4 bg-muted/20 space-y-4">
+                    {messages.map((msg, index) => (
+                        <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            {msg.role === 'model' && <Avatar className="w-8 h-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>}
+                            <div className={`rounded-lg px-4 py-2 max-w-[80%] ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>
+                                <p className="text-sm">{msg.content.split('\n')[0]}</p>
+                            </div>
+                            {msg.role === 'user' && <Avatar className="w-8 h-8"><AvatarFallback><User /></AvatarFallback></Avatar>}
+                        </div>
+                    ))}
+                    {loading && (
+                        <div className="flex items-start gap-3 justify-start">
+                             <Avatar className="w-8 h-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>
+                             <div className="rounded-lg px-4 py-2 max-w-[80%] bg-background">
+                                <Skeleton className="h-4 w-24" />
+                            </div>
+                        </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                    <Input
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="Type your message..."
+                        disabled={loading}
+                    />
+                     <Button type="button" variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={loading}>
+                        <ImageIcon className="h-4 w-4" />
+                        <span className="sr-only">Upload Image</span>
+                    </Button>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handlePhotoChange}
+                        className="hidden"
+                        accept="image/*"
+                    />
+                    <Button type="submit" disabled={loading}>
+                        <Send className="h-4 w-4" />
+                    </Button>
+                </form>
+            </CardContent>
+        </Card>
+    );
+}
 
 export default function UserDashboardPage() {
-  const [formKey, setFormKey] = useState(0); 
   const [missingPersonReports, setMissingPersonReports] = useState<Grievance[]>([]);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
@@ -526,44 +397,26 @@ export default function UserDashboardPage() {
         <UserProfileDisplay user={user} loading={loadingUser} />
         <Notifications user={user} />
         <MissingPersonsCarousel reports={missingPersonReports} />
-
-        <h1 className="text-3xl font-bold">Report an Issue</h1>
-        <p className="text-muted-foreground">Let us know how we can help. Your reports are sent directly to the event staff.</p>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        
+        {loadingUser ? (
             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Stethoscope /> Medical Attention
-                    </CardTitle>
-                    <CardDescription>Request immediate medical assistance.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <GrievanceForm key={`medical-${formKey}`} type="Medical Attention" onSuccess={() => setFormKey(k => k + 1)} user={user} />
+                <CardContent className="p-6">
+                    <Skeleton className="h-96 w-full" />
                 </CardContent>
             </Card>
+        ) : user ? (
+            <GrievanceChatbot user={user} />
+        ) : (
              <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Search /> Missing Person
-                    </CardTitle>
-                    <CardDescription>Report a person who is missing.</CardDescription>
+                    <CardTitle>Please Log In</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <GrievanceForm key={`missing-${formKey}`} type="Missing Person" onSuccess={() => setFormKey(k => k + 1)} user={user} />
+                    <p>You must be logged in to report an issue.</p>
                 </CardContent>
             </Card>
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <MessageSquareWarning /> General Grievance
-                    </CardTitle>
-                    <CardDescription>Report any other issues (e.g., lost item, safety concern).</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <GrievanceForm key={`general-${formKey}`} type="General Grievance" onSuccess={() => setFormKey(k => k + 1)} user={user} />
-                </CardContent>
-            </Card>
-        </div>
+        )}
     </div>
   );
 }
+
