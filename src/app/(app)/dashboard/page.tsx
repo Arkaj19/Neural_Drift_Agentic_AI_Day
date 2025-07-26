@@ -261,6 +261,16 @@ export default function DashboardPage() {
               },
             };
           });
+        } else {
+            // If response is not OK, but it's not a network error, stop polling.
+            if (alertsIntervalRef.current) {
+              clearInterval(alertsIntervalRef.current);
+            }
+            toast({
+                title: "Could not fetch alerts",
+                description: `The alerts service responded with status: ${response.status}. Please check the backend.`,
+                variant: "destructive"
+            });
         }
       } catch (error) {
         console.error("Failed to fetch active alerts:", error);
