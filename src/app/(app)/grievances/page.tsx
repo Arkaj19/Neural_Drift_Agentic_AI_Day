@@ -15,6 +15,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +41,19 @@ export interface Grievance {
   lastSeen?: string; 
   photoDataUri?: string; 
   location?: string; 
-  actionTaken?: 'Deploy Ambulance' | 'Send Medical Staff';
+  actionTaken?: string;
+}
+
+interface AmbulanceData {
+    id: string;
+    ambulanceNumber: string;
+    isAvailable: boolean;
+}
+
+interface MedicalStaffData {
+    id: string;
+    name: string;
+    status: string;
 }
 
 const grievanceIcons = {
@@ -55,20 +71,41 @@ const grievanceColors = {
 export default function GrievancesPage() {
   const [grievances, setGrievances] = useState<Grievance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ambulances, setAmbulances] = useState<AmbulanceData[]>([]);
+  const [medicalStaff, setMedicalStaff] = useState<MedicalStaffData[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
+    // Fetch Grievances
     const grievancesRef = collection(db, "grievances");
-    const unsubscribe = onSnapshot(grievancesRef, (snapshot) => {
+    const grievancesUnsubscribe = onSnapshot(grievancesRef, (snapshot) => {
       const grievancesData = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Grievance))
-        .filter(g => g.status === 'new') // Only show new grievances
+        .filter(g => g.status === 'new')
         .sort((a, b) => b.submittedAt.seconds - a.submittedAt.seconds);
       setGrievances(grievancesData);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Fetch Ambulances
+    const ambulancesRef = collection(db, "ambulances");
+    const ambulancesUnsubscribe = onSnapshot(ambulancesRef, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as AmbulanceData));
+        setAmbulances(data);
+    });
+
+    // Fetch Medical Staff
+    const medicalStaffRef = collection(db, "medical_staff");
+    const medicalStaffUnsubscribe = onSnapshot(medicalStaffRef, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as MedicalStaffData));
+        setMedicalStaff(data);
+    });
+
+    return () => {
+        grievancesUnsubscribe();
+        ambulancesUnsubscribe();
+        medicalStaffUnsubscribe();
+    };
   }, []);
 
   const handleResolve = async (id: string) => {
@@ -89,7 +126,7 @@ export default function GrievancesPage() {
     }
   };
 
-  const handleMedicalAction = async (grievance: Grievance, action: 'Deploy Ambulance' | 'Send Medical Staff') => {
+  const handleMedicalAction = async (grievance: Grievance, action: string) => {
     if (!grievance.id || !grievance.email) {
         toast({ title: "Error", description: "Grievance ID or user email is missing.", variant: "destructive" });
         return;
@@ -99,13 +136,11 @@ export default function GrievancesPage() {
     const notificationsRef = collection(db, "notifications");
     
     try {
-      // 1. Update the grievance
       await updateDoc(grievanceRef, { 
         status: 'resolved',
         actionTaken: action,
       });
 
-      // 2. Create a notification for the user
       await addDoc(notificationsRef, {
         userEmail: grievance.email,
         message: `Your request for medical attention at ${grievance.location || 'the specified location'} has been addressed. Action taken: ${action}.`,
@@ -150,6 +185,9 @@ export default function GrievancesPage() {
     );
   }
 
+  const availableAmbulances = ambulances.filter(a => a.isAvailable);
+  const availableStaff = medicalStaff.filter(s => s.status === 'available');
+
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-bold tracking-tight">Grievances</h2>
@@ -186,14 +224,36 @@ export default function GrievancesPage() {
                       <DropdownMenuContent align="end">
                         {grievance.type === 'Medical Attention' ? (
                           <>
-                            <DropdownMenuItem onClick={() => handleMedicalAction(grievance, 'Deploy Ambulance')}>
-                              <Ambulance className="mr-2 h-4 w-4" />
-                              Deploy Ambulance
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleMedicalAction(grievance, 'Send Medical Staff')}>
-                              <UserCheck className="mr-2 h-4 w-4" />
-                              Send Medical Staff
-                            </DropdownMenuItem>
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger disabled={availableAmbulances.length === 0}>
+                                    <Ambulance className="mr-2 h-4 w-4" />
+                                    Deploy Ambulance
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuPortal>
+                                    <DropdownMenuSubContent>
+                                        {availableAmbulances.map(amb => (
+                                            <DropdownMenuItem key={amb.id} onClick={() => handleMedicalAction(grievance, `Ambulance ${amb.ambulanceNumber} deployed`)}>
+                                                {amb.ambulanceNumber}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
+                            </DropdownMenuSub>
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger disabled={availableStaff.length === 0}>
+                                    <UserCheck className="mr-2 h-4 w-4" />
+                                    Send Medical Staff
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuPortal>
+                                     <DropdownMenuSubContent>
+                                        {availableStaff.map(staff => (
+                                            <DropdownMenuItem key={staff.id} onClick={() => handleMedicalAction(grievance, `Medical staff ${staff.name} sent`)}>
+                                                {staff.name}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
+                            </DropdownMenuSub>
                           </>
                         ) : (
                           <DropdownMenuItem onClick={() => handleResolve(grievance.id)}>
