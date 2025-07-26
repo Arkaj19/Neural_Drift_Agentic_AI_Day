@@ -14,7 +14,7 @@ export default function LandingPage() {
       <div className="w-full max-w-md">
         <Card className="shadow-2xl">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full">
+            <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center">
               <Icons.shield className="h-20 w-20" />
             </div>
             <CardTitle className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-400 text-transparent bg-clip-text">Drishti AI</CardTitle>
