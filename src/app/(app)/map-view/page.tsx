@@ -43,6 +43,33 @@ const statusStyle: React.CSSProperties = {
   fontSize: '12px',
 };
 
+const legendStyle: React.CSSProperties = {
+    position: 'absolute',
+    bottom: '10px',
+    right: '10px',
+    zIndex: 1000,
+    padding: '10px',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: '5px',
+    boxShadow: '0 0 10px rgba(0,0,0,0.2)',
+    fontSize: '12px',
+};
+
+const legendItemStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '5px',
+};
+
+const colorBoxStyle = (color: string): React.CSSProperties => ({
+    width: '15px',
+    height: '15px',
+    backgroundColor: color,
+    marginRight: '8px',
+    border: '1px solid #ccc',
+});
+
+
 const calculateCenter = (locations: HeatmapDataItem[]): [number, number] => {
   if (locations.length === 0) return [77.2092, 28.6141]; // lng, lat format
 
@@ -58,6 +85,22 @@ const calculateCenter = (locations: HeatmapDataItem[]): [number, number] => {
 };
 
 const defaultCenter: [number, number] = [77.2092, 28.6141]; // lng, lat format
+
+const MapLegend = () => (
+    <div style={legendStyle}>
+        <div style={{fontWeight: 'bold', marginBottom: '5px'}}>Population Density</div>
+        <div style={legendItemStyle}>
+            <span style={colorBoxStyle('#ef4444')}></span> High Density
+        </div>
+        <div style={legendItemStyle}>
+            <span style={colorBoxStyle('#f59e0b')}></span> Medium Density
+        </div>
+        <div style={legendItemStyle}>
+            <span style={colorBoxStyle('#22c55e')}></span> Normal Density
+        </div>
+    </div>
+);
+
 
 const MapViewPage: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -220,6 +263,7 @@ const MapViewPage: React.FC = () => {
           Fetching heatmap data...
         </div>
       )}
+      <MapLegend />
     </div>
   );
 };
