@@ -10,12 +10,12 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const CrowdManagementChatbotInputSchema = z.object({
+const CrowdManagementChatbotInputSchema = z.object({
   query: z.string().describe('The user query to the chatbot.'),
 });
 export type CrowdManagementChatbotInput = z.infer<typeof CrowdManagementChatbotInputSchema>;
 
-export const CrowdManagementChatbotOutputSchema = z.object({
+const CrowdManagementChatbotOutputSchema = z.object({
   category: z.enum(['MEDICAL_EMERGENCY', 'MISSING_PERSON', 'MAP_DIRECTIONS', 'DEFAULT']).describe('The category of the user query.'),
   response: z.string().describe('The chatbot response to the user.'),
   action: z.enum(['NAVIGATE_TO_EMERGENCY_FORM', 'NAVIGATE_TO_MISSING_PERSON_FORM', 'NAVIGATE_TO_MAP']).nullable().describe('The navigation action to be taken by the frontend.'),
