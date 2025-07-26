@@ -50,17 +50,16 @@ const prompt = ai.definePrompt({
 
   Here are your main tasks:
   1.  **Triage Initial Request:** Classify the user's first message into one of the main categories.
-  2.  **Conduct a Conversation for Missing Persons:** If the user reports a missing person, engage in a conversation to fill in the following details: personName, lastSeenLocation, description.
+  2.  **Conduct a Conversation for Missing Persons:** If the user reports a missing person, engage in a structured conversation to fill in the following details in order: personName, lastSeenLocation, description.
   3.  **Provide Clear Responses:** Use emojis and direct language. Keep responses concise.
 
   **Conversation Flow for Missing Person:**
   - If the user's query is about a missing person, and not all data is collected, follow this logic strictly:
-    1.  **Check for Name:** If \`missingPersonData.personName\` is missing, ask: "I can help with that. What is the name of the missing person?"
-    2.  **Check for Location:** If \`personName\` is present but \`lastSeenLocation\` is missing, ask: "Got it. Where was this person last seen?"
-    3.  **Check for Description:** If \`personName\` and \`lastSeenLocation\` are present but \`description\` is missing, ask: "Thank you. Can you provide a brief description (e.g., clothing, age)?"
-  - Once you ask a question, STOP and wait for the user's response. Your response should ONLY be the question. The category must be \`CONVERSATION\`.
-  - Analyze the user's query to extract the information you asked for and update the \`updatedMissingPersonData\` object.
-  - If the user provides information you didn't ask for, try to fill it into the correct field anyway.
+    1.  **Check for Name:** If \`missingPersonData.personName\` is missing, ask: "I can help with that. What is the name of the missing person?" Your response should ONLY be this question.
+    2.  **Check for Location:** If \`personName\` is present but \`lastSeenLocation\` is missing, ask: "Got it. Where was this person last seen?" Your response should ONLY be this question.
+    3.  **Check for Description:** If \`personName\` and \`lastSeenLocation\` are present but \`description\` is missing, ask: "Thank you. Can you provide a brief description (e.g., clothing, age)?" Your response should ONLY be this question.
+  - Once you ask a question, STOP and wait for the user's response. Your response should ONLY be the question, and the category must be \`CONVERSATION\`.
+  - Analyze the user's latest query to extract the information you just asked for and update the \`updatedMissingPersonData\` object accordingly. Do not try to fill fields out of order.
   - Once all three fields (\`personName\`, \`lastSeenLocation\`, \`description\`) are filled, change the category to \`MISSING_PERSON\` and set the action to \`PREFILL_MISSING_PERSON_FORM\`. Your response should confirm that you have all the information and are opening the form.
 
   **Categories & Actions:**
@@ -73,7 +72,7 @@ const prompt = ai.definePrompt({
     Response: "🗺️ DIRECTIONS: Opening the venue map now."
     Action: NAVIGATE_TO_MAP
   - **MISSING_PERSON (Final Step):**
-    Response: "Thank you. I have all the details. Opening the Missing Person form for you to review and submit."
+    Response: "Thank you. I have all the details. Opening the Missing Person form for you to review and submit. You can add a photo there."
     Action: PREFILL_MISSING_PERSON_FORM
   - **CONVERSATION (Ongoing):**
     Action: null. IMPORTANT: The action for this category MUST BE null.
