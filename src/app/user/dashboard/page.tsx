@@ -191,6 +191,17 @@ function Notifications({ user }: { user: UserProfile | null }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const { toast } = useToast();
 
+  const markAsRead = async (id: string) => {
+    const notifRef = doc(db, "notifications", id);
+    try {
+        await updateDoc(notifRef, { read: true });
+        toast({ title: "Notification marked as read." });
+    } catch (error) {
+        console.error("Error marking notification as read:", error);
+        toast({ title: "Error", description: "Could not update notification.", variant: "destructive" });
+    }
+  };
+
   useEffect(() => {
     if (!user?.email) return;
 
@@ -306,10 +317,11 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
         try {
             await createGrievance({
                 type,
-                submittedBy: user.email, // Use email instead of full name
+                submittedBy: user.email,
                 email: user.email,
                 ...details,
                 lastSeen,
+                photoFile: photo, // Pass the file object directly
             });
 
             toast({
@@ -330,7 +342,8 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
 
         } catch (error) {
             console.error("Error submitting grievance:", error);
-            toast({ title: "Error", description: "Failed to submit grievance. Please try again.", variant: "destructive" });
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+            toast({ title: "Error", description: `Failed to submit grievance: ${errorMessage}`, variant: "destructive" });
         } finally {
             setLoading(false);
         }
@@ -406,7 +419,6 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
                                 lastSeenHour,
                                 lastSeenMinute,
                                 details: missingDetails,
-                                photoFile: photo
                             });
                         }} className="space-y-4">
                             <div className="space-y-2">
