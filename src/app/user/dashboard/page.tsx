@@ -207,13 +207,13 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
                             Reported by {report.submittedBy} • {report.submittedAt ? formatTimestamp(report.submittedAt) : 'a few moments ago'}
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="grid gap-4 text-sm">
+                    <CardContent className="flex flex-row gap-4 text-sm">
                       {report.photoDataUri ? (
-                        <div className="relative aspect-square w-full rounded-md overflow-hidden">
+                        <div className="relative aspect-square w-32 h-32 rounded-md overflow-hidden flex-shrink-0">
                           <Image src={report.photoDataUri} alt={report.personName || 'Missing person'} layout="fill" objectFit="cover" />
                         </div>
                       ) : (
-                         <div className="aspect-square w-full bg-muted rounded-md flex items-center justify-center">
+                         <div className="aspect-square w-32 h-32 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
                             <ImageIcon className="h-12 w-12 text-muted-foreground" />
                          </div>
                       )}
