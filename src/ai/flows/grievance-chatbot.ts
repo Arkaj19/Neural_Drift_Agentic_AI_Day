@@ -15,7 +15,7 @@ const ChatMessageSchema = z.object({
   content: z.string(),
 });
 
-const GrievanceChatbotInputSchema = z.object({
+export const GrievanceChatbotInputSchema = z.object({
   history: z.array(ChatMessageSchema),
   user: z.object({
     fullName: z.string(),
