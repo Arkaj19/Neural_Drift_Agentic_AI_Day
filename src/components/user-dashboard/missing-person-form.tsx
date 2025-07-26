@@ -15,6 +15,7 @@ import { ImageIcon, X } from 'lucide-react';
 export interface MissingPersonFormData {
     personName: string;
     lastSeenLocation: string;
+    lastSeenTime?: string; // from chatbot
     lastSeenHour: string;
     lastSeenMinute: string;
     details: string;
@@ -62,6 +63,25 @@ export default function MissingPersonForm({ user, locations, loading, handleSubm
             setPersonName(prefilledData.personName || '');
             setLastSeenLocation(prefilledData.lastSeenLocation || '');
             setDetails(prefilledData.details || '');
+            
+            if (prefilledData.lastSeenTime) {
+                // Basic time parsing from chatbot response (e.g., "5pm", "around 3:30")
+                const timeMatch = prefilledData.lastSeenTime.match(/(\d{1,2})[:\s]?(\d{2})?\s?(am|pm)?/i);
+                if (timeMatch) {
+                    let hour = parseInt(timeMatch[1], 10);
+                    const minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+                    const period = timeMatch[3]?.toLowerCase();
+
+                    if (period === 'pm' && hour < 12) {
+                        hour += 12;
+                    } else if (period === 'am' && hour === 12) {
+                        hour = 0;
+                    }
+                    
+                    setLastSeenHour(hour.toString().padStart(2, '0'));
+                    setLastSeenMinute(minute.toString().padStart(2, '0'));
+                }
+            }
         }
     }, [prefilledData]);
 
@@ -81,7 +101,7 @@ export default function MissingPersonForm({ user, locations, loading, handleSubm
         <div>
             <CardHeader className="px-1 pt-4">
                 <CardTitle>Missing Person</CardTitle>
-                <CardDescription>Report a missing person.</CardDescription>
+                <CardDescription>Report a missing person. Please review the pre-filled details.</CardDescription>
             </CardHeader>
             <CardContent className="px-1">
                  <form onSubmit={(e) => {
@@ -113,7 +133,7 @@ export default function MissingPersonForm({ user, locations, loading, handleSubm
                      <div className="space-y-2">
                         <Label>Last Seen Time</Label>
                         <div className="grid grid-cols-2 gap-2">
-                            <Select value={lastSeenHour} onValueChange={setLastSeenHour}>
+                            <Select value={lastSeenHour} onValueChange={setLastSeenHour} required>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Hour" />
                                 </SelectTrigger>
@@ -121,7 +141,7 @@ export default function MissingPersonForm({ user, locations, loading, handleSubm
                                     {hours.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                                 </SelectContent>
                             </Select>
-                            <Select value={lastSeenMinute} onValueChange={setLastSeenMinute}>
+                            <Select value={lastSeenMinute} onValueChange={setLastSeenMinute} required>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Minute" />
                                 </SelectTrigger>

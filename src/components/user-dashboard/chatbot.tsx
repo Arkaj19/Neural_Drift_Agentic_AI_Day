@@ -79,6 +79,7 @@ export default function Chatbot({ handleNavigation, handlePrefillAndNavigate }: 
                             handlePrefillAndNavigate({
                                 personName: result.updatedMissingPersonData.personName,
                                 lastSeenLocation: result.updatedMissingPersonData.lastSeenLocation,
+                                lastSeenTime: result.updatedMissingPersonData.lastSeenTime,
                                 details: result.updatedMissingPersonData.description,
                             });
                         }
