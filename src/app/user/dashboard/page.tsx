@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Mail, Phone, AlertTriangle, Image as ImageIcon, X, Bell, BellRing } from "lucide-react";
+import { Mail, Phone, AlertTriangle, Image as ImageIcon, X, Bell, BellRing, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface UserProfile {
     id: string;
@@ -207,16 +208,6 @@ function Notifications({ user }: { user: UserProfile | null }) {
     return () => unsubscribe();
   }, [user]);
 
-  const markAsRead = async (id: string) => {
-    const notifRef = doc(db, "notifications", id);
-    try {
-      await updateDoc(notifRef, { read: true });
-    } catch (error) {
-      console.error("Error marking notification as read:", error);
-      toast({ title: "Error", description: "Could not dismiss notification.", variant: "destructive" });
-    }
-  };
-
   if (notifications.length === 0) {
     return null;
   }
@@ -246,6 +237,7 @@ function Notifications({ user }: { user: UserProfile | null }) {
 function GrievanceForm({ user }: { user: UserProfile | null }) {
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
+    const [locations, setLocations] = useState<{name: string, area: string}[]>([]);
 
     // State for Medical Attention
     const [medicalDetails, setMedicalDetails] = useState('');
@@ -253,7 +245,9 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
 
     // State for Missing Person
     const [personName, setPersonName] = useState('');
-    const [lastSeen, setLastSeen] = useState('');
+    const [lastSeenLocation, setLastSeenLocation] = useState('');
+    const [lastSeenHour, setLastSeenHour] = useState('');
+    const [lastSeenMinute, setLastSeenMinute] = useState('');
     const [missingDetails, setMissingDetails] = useState('');
     const [photo, setPhoto] = useState<File | null>(null);
     const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -261,6 +255,29 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
 
     // State for General Grievance
     const [generalDetails, setGeneralDetails] = useState('');
+
+    useEffect(() => {
+        const fetchLocations = async () => {
+            try {
+                const response = await fetch('http://localhost:5000/api/feeds');
+                const data = await response.json();
+                if (data.feeds) {
+                    const feedLocations = Object.values(data.feeds).map((feed: any) => ({
+                        name: feed.name,
+                        area: feed.area
+                    }));
+                    setLocations(feedLocations);
+                }
+            } catch (error) {
+                console.error("Failed to fetch locations:", error);
+                toast({ title: "Error", description: "Could not load locations for forms.", variant: "destructive" });
+            }
+        };
+        fetchLocations();
+    }, [toast]);
+    
+    const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
+    const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -283,13 +300,16 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
             return;
         }
         setLoading(true);
+        
+        const lastSeen = details.lastSeenLocation ? `${details.lastSeenLocation} at ${details.lastSeenHour}:${details.lastSeenMinute}` : undefined;
 
         try {
             await createGrievance({
                 type,
-                submittedBy: user.fullName,
+                submittedBy: user.email, // Use email instead of full name
                 email: user.email,
-                ...details
+                ...details,
+                lastSeen,
             });
 
             toast({
@@ -300,7 +320,9 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
             setMedicalDetails('');
             setMedicalLocation('');
             setPersonName('');
-            setLastSeen('');
+            setLastSeenLocation('');
+            setLastSeenHour('');
+            setLastSeenMinute('');
             setMissingDetails('');
             setPhoto(null);
             setPhotoPreview(null);
@@ -348,11 +370,22 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
                         }} className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="medical-location">Your Location</Label>
-                                <Input id="medical-location" placeholder="e.g., Near Stage B" value={medicalLocation} onChange={(e) => setMedicalLocation(e.target.value)} required />
+                                <Select value={medicalLocation} onValueChange={setMedicalLocation} required>
+                                    <SelectTrigger id="medical-location">
+                                        <SelectValue placeholder="Select location" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {locations.map(loc => <SelectItem key={loc.area} value={loc.name}>{loc.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="medical-details">Details of Emergency</Label>
                                 <Textarea id="medical-details" placeholder="Describe the situation" value={medicalDetails} onChange={(e) => setMedicalDetails(e.target.value)} required />
+                            </div>
+                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Clock className="h-4 w-4" />
+                                <span>Time will be recorded automatically.</span>
                             </div>
                             <Button type="submit" disabled={loading} className="w-full">Submit Medical Report</Button>
                         </form>
@@ -369,7 +402,9 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
                             e.preventDefault();
                             handleSubmit('Missing Person', {
                                 personName,
-                                lastSeen,
+                                lastSeenLocation,
+                                lastSeenHour,
+                                lastSeenMinute,
                                 details: missingDetails,
                                 photoFile: photo
                             });
@@ -379,8 +414,33 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
                                 <Input id="person-name" value={personName} onChange={e => setPersonName(e.target.value)} required />
                             </div>
                              <div className="space-y-2">
-                                <Label htmlFor="last-seen">Last Seen Location & Time</Label>
-                                <Input id="last-seen" value={lastSeen} onChange={e => setLastSeen(e.target.value)} required />
+                                <Label>Last Seen</Label>
+                                <Select value={lastSeenLocation} onValueChange={setLastSeenLocation} required>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select location" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {locations.map(loc => <SelectItem key={loc.area} value={loc.name}>{loc.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Select value={lastSeenHour} onValueChange={setLastSeenHour} required>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Hour" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {hours.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <Select value={lastSeenMinute} onValueChange={setLastSeenMinute} required>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Minute" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {minutes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="missing-details">Description (clothing, etc.)</Label>
