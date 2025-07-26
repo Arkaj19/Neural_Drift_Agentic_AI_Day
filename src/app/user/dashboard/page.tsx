@@ -271,6 +271,9 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
         const fetchLocations = async () => {
             try {
                 const response = await fetch('http://localhost:5000/api/feeds');
+                if (!response.ok) {
+                    throw new Error(`API responded with status ${response.status}`);
+                }
                 const data = await response.json();
                 if (data.feeds) {
                     const feedLocations = Object.values(data.feeds).map((feed: any) => ({
@@ -281,7 +284,11 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
                 }
             } catch (error) {
                 console.error("Failed to fetch locations:", error);
-                toast({ title: "Error", description: "Could not load locations for forms.", variant: "destructive" });
+                toast({ 
+                    title: "Could Not Load Locations", 
+                    description: "The grievance forms may not work as expected. Please ensure the backend service is running.", 
+                    variant: "destructive" 
+                });
             }
         };
         fetchLocations();
