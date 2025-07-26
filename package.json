@@ -49,6 +49,7 @@
     "genkit": "^1.14.1",
     "lucide-react": "^0.475.0",
     "maplibre-gl": "^4.3.2",
+    "nanoid": "^5.0.7",
     "next": "15.3.3",
     "next-themes": "^0.3.0",
     "patch-package": "^8.0.0",

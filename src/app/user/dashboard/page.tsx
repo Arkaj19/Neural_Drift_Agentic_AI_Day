@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Mail, Phone, AlertTriangle, Image as ImageIcon, X, Bell, BellRing, Clock, Stethoscope, Search, MessageSquareWarning } from "lucide-react";
+import { Mail, Phone, AlertTriangle, Image as ImageIcon, X, Bell, BellRing, Clock, Stethoscope, Search, MessageSquareWarning, Bot, Send } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createGrievance } from '@/services/grievance-service';
@@ -34,6 +34,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { crowdManagementChatbot, type CrowdManagementChatbotOutput } from '@/ai/flows/crowd-management-chatbot';
+import { useRouter } from 'next/navigation';
+import { nanoid } from 'nanoid';
 
 
 export interface UserProfile {
@@ -197,7 +200,7 @@ function Notifications({ user }: { user: UserProfile | null }) {
   );
 }
 
-const handleSubmit = async (
+const handleGrievanceSubmit = async (
     type: Grievance['type'],
     details: Record<string, any>,
     user: UserProfile | null,
@@ -396,36 +399,102 @@ function MissingPersonForm({ user, locations, loading, handleSubmit, resetForms 
     );
 }
 
-function GeneralGrievanceForm({ user, loading, handleSubmit, resetForms }: { user: UserProfile | null, loading: boolean, handleSubmit: Function, resetForms: () => void }) {
-    const [generalDetails, setGeneralDetails] = useState('');
-    
-    const onReset = () => {
-        setGeneralDetails('');
-    }
+interface ChatMessage {
+    id: string;
+    role: 'user' | 'bot';
+    text: string;
+}
 
-    useEffect(onReset, [resetForms]);
+function Chatbot({ handleNavigation }: { handleNavigation: (path: string, tab?: string) => void }) {
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [input, setInput] = useState('');
+    const [loading, setLoading] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(scrollToBottom, [messages]);
+
+    useEffect(() => {
+        // Initial bot message
+        setMessages([{ id: nanoid(), role: 'bot', text: "How can I help you today?" }]);
+    }, []);
+
+    const handleChatSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!input.trim() || loading) return;
+
+        const userMessage: ChatMessage = { id: nanoid(), role: 'user', text: input };
+        setMessages(prev => [...prev, userMessage]);
+        setInput('');
+        setLoading(true);
+
+        try {
+            const result = await crowdManagementChatbot({ query: input });
+            const botMessage: ChatMessage = { id: nanoid(), role: 'bot', text: result.response };
+            setMessages(prev => [...prev, botMessage]);
+
+            // Handle navigation actions
+            if (result.action) {
+                switch (result.action) {
+                    case 'NAVIGATE_TO_EMERGENCY_FORM':
+                        handleNavigation('user/dashboard', 'medical');
+                        break;
+                    case 'NAVIGATE_TO_MISSING_PERSON_FORM':
+                        handleNavigation('user/dashboard', 'missing');
+                        break;
+                    case 'NAVIGATE_TO_MAP':
+                        handleNavigation('/map-view');
+                        break;
+                }
+            }
+        } catch (error) {
+            console.error("Chatbot error:", error);
+            const errorMessage: ChatMessage = { id: nanoid(), role: 'bot', text: "Sorry, I'm having trouble connecting. Please try again later." };
+            setMessages(prev => [...prev, errorMessage]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div>
             <CardHeader className="px-1 pt-4">
-                <CardTitle>General Grievance</CardTitle>
-                <CardDescription>Report a general concern.</CardDescription>
+                <CardTitle>Drishti Assistant</CardTitle>
+                <CardDescription>Ask for help or directions.</CardDescription>
             </CardHeader>
             <CardContent className="px-1">
-                <form onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSubmit('General Grievance', { details: generalDetails }, user);
-                }} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="general-details">Describe your concern</Label>
-                        <Textarea id="general-details" className="h-52" placeholder="Please provide as much detail as possible." value={generalDetails} onChange={(e) => setGeneralDetails(e.target.value)} required />
+                <div className="h-[400px] flex flex-col">
+                    <div className="flex-grow space-y-4 overflow-y-auto p-4 border rounded-md bg-muted/50">
+                        {messages.map((msg) => (
+                            <div key={msg.id} className={cn("flex items-start gap-3", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                                {msg.role === 'bot' && <Avatar className="w-8 h-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>}
+                                <div className={cn("max-w-xs rounded-lg px-4 py-2 whitespace-pre-wrap", msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background')}>
+                                    {msg.text}
+                                </div>
+                            </div>
+                        ))}
+                         <div ref={messagesEndRef} />
                     </div>
-                     <Button type="submit" disabled={loading} className="w-full">Submit General Grievance</Button>
-                </form>
+                    <form onSubmit={handleChatSubmit} className="flex items-center gap-2 pt-4">
+                        <Input
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            placeholder="Type your message..."
+                            disabled={loading}
+                        />
+                        <Button type="submit" disabled={loading}>
+                            {loading ? <Skeleton className="h-5 w-5 rounded-full animate-spin" /> : <Send />}
+                        </Button>
+                    </form>
+                </div>
             </CardContent>
         </div>
     );
 }
+
 
 export default function UserDashboardPage() {
   const [missingPersonReports, setMissingPersonReports] = useState<Grievance[]>([]);
@@ -435,9 +504,22 @@ export default function UserDashboardPage() {
   const [formLoading, setFormLoading] = useState(false);
   const { toast } = useToast();
   const [formResetCounter, setFormResetCounter] = useState(0);
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState("chatbot");
+
 
   const resetAllForms = () => {
     setFormResetCounter(prev => prev + 1);
+  };
+
+  const handleNavigation = (path: string, tab?: string) => {
+    if (path.startsWith('/')) {
+        router.push(path);
+    } else {
+        if (tab) {
+            setActiveTab(tab);
+        }
+    }
   };
 
 
@@ -537,11 +619,11 @@ export default function UserDashboardPage() {
             <CardHeader>
                 <CardTitle>Report an Issue</CardTitle>
                 <CardDescription>
-                    Use the tabs below to report a medical emergency, a missing person, or a general concern.
+                    Use the tabs below to report a medical emergency, a missing person, or to chat with our assistant.
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <Tabs defaultValue="medical" className="w-full">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="grid w-full grid-cols-3 bg-muted p-1 rounded-full h-auto">
                         <TabsTrigger value="medical" className="flex items-center gap-2 rounded-full data-[state=active]:bg-white data-[state=active]:shadow-md dark:data-[state=active]:bg-slate-800 py-2">
                             <Stethoscope className="h-4 w-4 text-red-500" /> Medical
@@ -549,8 +631,8 @@ export default function UserDashboardPage() {
                         <TabsTrigger value="missing" className="flex items-center gap-2 rounded-full data-[state=active]:bg-white data-[state=active]:shadow-md dark:data-[state=active]:bg-slate-800 py-2">
                             <Search className="h-4 w-4 text-blue-500" /> Missing Person
                         </TabsTrigger>
-                        <TabsTrigger value="general" className="flex items-center gap-2 rounded-full data-[state=active]:bg-white data-[state=active]:shadow-md dark:data-[state=active]:bg-slate-800 py-2">
-                            <MessageSquareWarning className="h-4 w-4 text-gray-500" /> General
+                         <TabsTrigger value="chatbot" className="flex items-center gap-2 rounded-full data-[state=active]:bg-white data-[state=active]:shadow-md dark:data-[state=active]:bg-slate-800 py-2">
+                            <Bot className="h-4 w-4 text-purple-500" /> Assistant
                         </TabsTrigger>
                     </TabsList>
                     <TabsContent value="medical">
@@ -558,7 +640,7 @@ export default function UserDashboardPage() {
                             user={user} 
                             locations={locations} 
                             loading={formLoading}
-                            handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
+                            handleSubmit={(type: any, details: any, user: any) => handleGrievanceSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
                             resetForms={formResetCounter > 0}
                         />
                     </TabsContent>
@@ -567,17 +649,12 @@ export default function UserDashboardPage() {
                             user={user} 
                             locations={locations} 
                             loading={formLoading}
-                            handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
+                            handleSubmit={(type: any, details: any, user: any) => handleGrievanceSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
                             resetForms={formResetCounter > 0}
                         />
                     </TabsContent>
-                    <TabsContent value="general">
-                         <GeneralGrievanceForm
-                            user={user}
-                            loading={formLoading}
-                            handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
-                            resetForms={formResetCounter > 0}
-                        />
+                    <TabsContent value="chatbot">
+                         <Chatbot handleNavigation={handleNavigation} />
                     </TabsContent>
                 </Tabs>
             </CardContent>
@@ -585,4 +662,3 @@ export default function UserDashboardPage() {
     </div>
   );
 }
-
