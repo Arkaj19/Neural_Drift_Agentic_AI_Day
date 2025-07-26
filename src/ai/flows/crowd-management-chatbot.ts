@@ -12,6 +12,7 @@ import {z} from 'genkit';
 
 // Define Zod schemas but do not export them to comply with 'use server' constraints.
 const ChatMessageSchema = z.object({
+  id: z.string(),
   role: z.enum(['user', 'bot']),
   text: z.string(),
 });
@@ -79,7 +80,7 @@ const prompt = ai.definePrompt({
     Action: null
 
   **Current Conversation State:**
-  - History: {{history}}
+  - History: The user's conversation history is provided in the input. Use it for context.
   - Current Missing Person Data: {{{missingPersonData}}}
   - User's Latest Message: {{{query}}}
 
