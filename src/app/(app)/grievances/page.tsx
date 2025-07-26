@@ -19,7 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, User, Search, Stethoscope, MessageSquareWarning, RefreshCw, AlertTriangle } from "lucide-react";
+import { MoreHorizontal, User, Search, Stethoscope, MessageSquareWarning, RefreshCw, AlertTriangle, Image as ImageIcon } from "lucide-react";
+import Image from "next/image";
 
 export interface Grievance {
   id: string;
@@ -33,6 +34,7 @@ export interface Grievance {
   submittedBy?: string; // name of the user
   personName?: string; // For missing person
   lastSeen?: string; // For missing person
+  photoDataUri?: string; // For missing person image
 }
 
 const grievanceIcons = {
@@ -152,6 +154,11 @@ export default function GrievancesPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {grievance.photoDataUri && (
+                    <div className="relative aspect-video w-full mb-4 rounded-md overflow-hidden">
+                       <Image src={grievance.photoDataUri} alt={grievance.personName || 'Missing person'} layout="fill" objectFit="cover" />
+                    </div>
+                   )}
                   {grievance.type === 'Missing Person' && (
                     <div className="space-y-2 text-sm">
                       <p><strong>Name:</strong> {grievance.personName}</p>

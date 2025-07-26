@@ -1,6 +1,7 @@
 
 'use client';
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import {
   Card,
   CardContent,
@@ -8,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { User, Search, Stethoscope, MessageSquareWarning, AlertTriangle, Mail, Phone, UserCircle } from "lucide-react";
+import { User, Search, Stethoscope, MessageSquareWarning, AlertTriangle, Mail, Phone, UserCircle, Image as ImageIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -45,8 +46,20 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
   const [details, setDetails] = useState('');
   const [personName, setPersonName] = useState('');
   const [lastSeen, setLastSeen] = useState('');
+  const [photoDataUri, setPhotoDataUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoDataUri(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +89,7 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
           ...grievanceData,
           personName,
           lastSeen,
+          photoDataUri,
         };
       }
 
@@ -89,6 +103,7 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
       setDetails('');
       setPersonName('');
       setLastSeen('');
+      setPhotoDataUri(null);
 
     } catch (error) {
       console.error('Error submitting grievance:', error);
@@ -113,6 +128,15 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
           <div className="space-y-2">
             <Label htmlFor="lastSeen">Last Seen (Location & Time)</Label>
             <Input id="lastSeen" value={lastSeen} onChange={(e) => setLastSeen(e.target.value)} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="photo">Photo</Label>
+            <Input id="photo" type="file" onChange={handlePhotoChange} accept="image/*" />
+            {photoDataUri && (
+                <div className="mt-2 relative h-32 w-32">
+                    <Image src={photoDataUri} alt="Preview" layout="fill" objectFit="cover" className="rounded-md" />
+                </div>
+            )}
           </div>
         </>
       )}
@@ -172,14 +196,25 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
                             Reported by {report.submittedBy} • {report.submittedAt ? formatTimestamp(report.submittedAt) : 'a few moments ago'}
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="grid gap-2 text-sm">
-                      <div>
-                        <p className="font-semibold">Last Seen</p>
-                        <p className="text-muted-foreground">{report.lastSeen}</p>
-                      </div>
-                       <div>
-                        <p className="font-semibold">Details</p>
-                        <p className="text-muted-foreground">{report.details}</p>
+                    <CardContent className="grid gap-4 text-sm">
+                      {report.photoDataUri ? (
+                        <div className="relative aspect-square w-full rounded-md overflow-hidden">
+                          <Image src={report.photoDataUri} alt={report.personName || 'Missing person'} layout="fill" objectFit="cover" />
+                        </div>
+                      ) : (
+                         <div className="aspect-square w-full bg-muted rounded-md flex items-center justify-center">
+                            <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                         </div>
+                      )}
+                      <div className='grid gap-2'>
+                        <div>
+                          <p className="font-semibold">Last Seen</p>
+                          <p className="text-muted-foreground">{report.lastSeen}</p>
+                        </div>
+                         <div>
+                          <p className="font-semibold">Details</p>
+                          <p className="text-muted-foreground">{report.details}</p>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
