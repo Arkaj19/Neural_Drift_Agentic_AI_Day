@@ -53,6 +53,7 @@ const legendStyle: React.CSSProperties = {
     borderRadius: '5px',
     boxShadow: '0 0 10px rgba(0,0,0,0.2)',
     fontSize: '12px',
+    color: 'black',
 };
 
 const legendItemStyle: React.CSSProperties = {
