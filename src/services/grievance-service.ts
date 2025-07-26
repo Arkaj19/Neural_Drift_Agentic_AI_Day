@@ -41,7 +41,7 @@ export const createGrievance = ai.defineTool(
   },
   async (input, context) => {
     if (!context?.submittedBy || !context?.email) {
-      throw new Error('User information is missing.');
+      throw new Error('User information is missing from the context.');
     }
 
     try {
