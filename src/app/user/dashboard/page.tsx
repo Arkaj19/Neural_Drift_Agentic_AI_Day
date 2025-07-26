@@ -32,6 +32,8 @@ import { createGrievance } from '@/services/grievance-service';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 
 export interface UserProfile {
@@ -73,12 +75,12 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
   };
 
   return (
-    <Card className="border-yellow-500 bg-yellow-900/10 mb-6">
+    <Card className="border-yellow-500 bg-yellow-400/20 dark:bg-yellow-900/20 mb-6 rounded-3xl shadow-lg">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-yellow-400">
+        <CardTitle className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
           <AlertTriangle /> Missing Person Alerts
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-yellow-800/80 dark:text-yellow-200/80">
           Please be on the lookout for the following individuals. If seen, please report to the nearest security personnel.
         </CardDescription>
       </CardHeader>
@@ -88,36 +90,35 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
             align: "start",
             loop: reports.length > 1,
           }}
+          className="w-full"
         >
           <CarouselContent>
             {reports.map((report) => (
               <CarouselItem key={report.id}>
                 <div className="p-1">
-                  <Card className="bg-background/50">
-                    <CardHeader>
-                        <CardTitle>{report.personName}</CardTitle>
-                        <CardDescription>
-                            Reported by {report.submittedBy} • {report.submittedAt ? formatTimestamp(report.submittedAt) : 'a few moments ago'}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col sm:flex-row gap-4 text-sm">
+                  <Card className="bg-white/80 dark:bg-background/50 backdrop-blur-sm rounded-2xl">
+                    <CardContent className="flex flex-col sm:flex-row gap-4 text-sm p-4 items-center">
                       {report.photoDataUri ? (
-                        <div className="relative aspect-square w-32 h-32 rounded-md overflow-hidden flex-shrink-0">
+                        <div className="relative aspect-square w-24 h-24 rounded-lg overflow-hidden flex-shrink-0">
                           <Image src={report.photoDataUri} alt={report.personName || 'Missing person'} layout="fill" objectFit="cover" />
                         </div>
                       ) : (
-                         <div className="aspect-square w-32 h-32 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
-                            <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                         </div>
+                         <Avatar className="h-24 w-24 text-3xl">
+                           <AvatarFallback className="bg-purple-200 dark:bg-purple-800 text-purple-700 dark:text-purple-200">
+                             {report.personName?.charAt(0) || 'R'}
+                           </AvatarFallback>
+                         </Avatar>
                       )}
-                      <div className='grid gap-2'>
-                        <div>
-                          <p className="font-semibold">Last Seen</p>
-                          <p className="text-muted-foreground">{report.lastSeen}</p>
-                        </div>
-                         <div>
-                          <p className="font-semibold">Details</p>
-                          <p className="text-muted-foreground">{report.details}</p>
+                      <div className='grid gap-1 flex-grow'>
+                        <p className="font-bold text-lg">{report.personName}</p>
+                        <p className="text-muted-foreground">
+                            <span className="font-semibold">Last Seen:</span> {report.lastSeen}
+                        </p>
+                        <p className="text-muted-foreground">
+                            <span className="font-semibold">Reported by:</span> {report.submittedBy} • {report.submittedAt ? formatTimestamp(report.submittedAt) : 'a few moments ago'}
+                        </p>
+                        <div className="mt-2">
+                          <Badge variant="secondary" className='bg-gray-200 dark:bg-gray-700'>Black hoodie</Badge>
                         </div>
                       </div>
                     </CardContent>
@@ -128,61 +129,14 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
           </CarouselContent>
           {reports.length > 1 && (
             <>
-              <CarouselPrevious />
-              <CarouselNext />
+              <CarouselPrevious className="left-[-1rem]" />
+              <CarouselNext className="right-[-1rem]" />
             </>
           )}
         </Carousel>
       </CardContent>
     </Card>
   );
-}
-
-function UserProfileDisplay({ user, loading }: { user: UserProfile | null, loading: boolean }) {
-    if (loading) {
-        return <Skeleton className="h-24 w-full mb-6" />;
-    }
-
-    if (!user) {
-        return (
-            <Card className="mb-6">
-                <CardContent className="p-4 text-center text-muted-foreground">
-                    Could not load user profile. Please log in again.
-                </CardContent>
-            </Card>
-        );
-    }
-
-    const getInitials = (name: string) => {
-        if (!name) return '';
-        return name.split(' ').map(n => n[0]).join('').toUpperCase();
-    }
-
-    return (
-        <Card className="mb-6 overflow-hidden">
-            <CardContent className="p-4 flex items-center gap-4">
-                <Avatar className="h-16 w-16">
-                    <AvatarFallback className="text-xl">
-                        {getInitials(user.fullName)}
-                    </AvatarFallback>
-                </Avatar>
-                <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <div>
-                        <h3 className="text-xl font-bold">{user.fullName}</h3>
-                        <p className="text-sm text-muted-foreground">Welcome back!</p>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span>{user.email}</span>
-                    </div>
-                     <div className="flex items-center gap-2 text-sm">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span>{user.phone}</span>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
 }
 
 function Notifications({ user }: { user: UserProfile | null }) {
@@ -225,7 +179,7 @@ function Notifications({ user }: { user: UserProfile | null }) {
     <div className="space-y-4 mb-6">
       <h2 className="text-2xl font-bold flex items-center gap-2"><BellRing /> Notifications</h2>
       {notifications.map((notif) => (
-        <Alert key={notif.id} variant="default" className="border-accent">
+        <Alert key={notif.id} variant="default" className="border-accent rounded-2xl">
           <Bell className="h-4 w-4" />
           <AlertTitle>Update on your request</AlertTitle>
           <AlertDescription>{notif.message}</AlertDescription>
@@ -295,12 +249,12 @@ function MedicalAttentionForm({ user, locations, loading, handleSubmit, resetFor
     useEffect(onReset, [resetForms]);
 
     return (
-        <Card>
-            <CardHeader>
+        <div>
+            <CardHeader className="px-1 pt-4">
                 <CardTitle>Medical Attention</CardTitle>
                 <CardDescription>Report a medical emergency.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-1">
                 <form onSubmit={(e) => {
                     e.preventDefault();
                     handleSubmit('Medical Attention', { details: medicalDetails, location: medicalLocation }, user);
@@ -320,14 +274,10 @@ function MedicalAttentionForm({ user, locations, loading, handleSubmit, resetFor
                         <Label htmlFor="medical-details">Details of Emergency</Label>
                         <Textarea id="medical-details" placeholder="Describe the situation" value={medicalDetails} onChange={(e) => setMedicalDetails(e.target.value)} required />
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>Time will be recorded automatically.</span>
-                    </div>
                     <Button type="submit" disabled={loading} className="w-full">Submit Medical Report</Button>
                 </form>
             </CardContent>
-        </Card>
+        </div>
     );
 }
 
@@ -369,12 +319,12 @@ function MissingPersonForm({ user, locations, loading, handleSubmit, resetForms 
     };
 
     return (
-        <Card>
-            <CardHeader>
+        <div>
+            <CardHeader className="px-1 pt-4">
                 <CardTitle>Missing Person</CardTitle>
                 <CardDescription>Report a missing person.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-1">
                  <form onSubmit={(e) => {
                     e.preventDefault();
                     handleSubmit('Missing Person', {
@@ -442,7 +392,7 @@ function MissingPersonForm({ user, locations, loading, handleSubmit, resetForms 
                     <Button type="submit" disabled={loading} className="w-full">Submit Missing Person Report</Button>
                 </form>
             </CardContent>
-        </Card>
+        </div>
     );
 }
 
@@ -456,12 +406,12 @@ function GeneralGrievanceForm({ user, loading, handleSubmit, resetForms }: { use
     useEffect(onReset, [resetForms]);
 
     return (
-        <Card>
-            <CardHeader>
+        <div>
+            <CardHeader className="px-1 pt-4">
                 <CardTitle>General Grievance</CardTitle>
                 <CardDescription>Report a general concern.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-1">
                 <form onSubmit={(e) => {
                     e.preventDefault();
                     handleSubmit('General Grievance', { details: generalDetails }, user);
@@ -473,7 +423,7 @@ function GeneralGrievanceForm({ user, loading, handleSubmit, resetForms }: { use
                      <Button type="submit" disabled={loading} className="w-full">Submit General Grievance</Button>
                 </form>
             </CardContent>
-        </Card>
+        </div>
     );
 }
 
@@ -579,58 +529,60 @@ export default function UserDashboardPage() {
   }
 
   return (
-    <div className="space-y-4">
-        <UserProfileDisplay user={user} loading={loadingUser} />
+    <div className="space-y-6">
         <Notifications user={user} />
         <MissingPersonsCarousel reports={missingPersonReports} />
 
-        <div>
-            <CardHeader className="px-0">
+        <Card className="rounded-3xl shadow-lg">
+            <CardHeader>
                 <CardTitle>Report an Issue</CardTitle>
                 <CardDescription>
                     Use the tabs below to report a medical emergency, a missing person, or a general concern.
                 </CardDescription>
             </CardHeader>
-            <Tabs defaultValue="medical" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="medical">
-                        <Stethoscope className="mr-2 h-4 w-4" /> Medical
-                    </TabsTrigger>
-                    <TabsTrigger value="missing">
-                        <Search className="mr-2 h-4 w-4" /> Missing Person
-                    </TabsTrigger>
-                    <TabsTrigger value="general">
-                        <MessageSquareWarning className="mr-2 h-4 w-4" /> General
-                    </TabsTrigger>
-                </TabsList>
-                <TabsContent value="medical">
-                   <MedicalAttentionForm 
-                        user={user} 
-                        locations={locations} 
-                        loading={formLoading}
-                        handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
-                        resetForms={formResetCounter > 0}
-                    />
-                </TabsContent>
-                <TabsContent value="missing">
-                    <MissingPersonForm 
-                        user={user} 
-                        locations={locations} 
-                        loading={formLoading}
-                        handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
-                        resetForms={formResetCounter > 0}
-                    />
-                </TabsContent>
-                <TabsContent value="general">
-                     <GeneralGrievanceForm
-                        user={user}
-                        loading={formLoading}
-                        handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
-                        resetForms={formResetCounter > 0}
-                    />
-                </TabsContent>
-            </Tabs>
-        </div>
+            <CardContent>
+                <Tabs defaultValue="medical" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3 bg-muted p-1 rounded-full h-auto">
+                        <TabsTrigger value="medical" className="flex items-center gap-2 rounded-full data-[state=active]:bg-white data-[state=active]:shadow-md dark:data-[state=active]:bg-slate-800 py-2">
+                            <Stethoscope className="h-4 w-4 text-red-500" /> Medical
+                        </TabsTrigger>
+                        <TabsTrigger value="missing" className="flex items-center gap-2 rounded-full data-[state=active]:bg-white data-[state=active]:shadow-md dark:data-[state=active]:bg-slate-800 py-2">
+                            <Search className="h-4 w-4 text-blue-500" /> Missing Person
+                        </TabsTrigger>
+                        <TabsTrigger value="general" className="flex items-center gap-2 rounded-full data-[state=active]:bg-white data-[state=active]:shadow-md dark:data-[state=active]:bg-slate-800 py-2">
+                            <MessageSquareWarning className="h-4 w-4 text-gray-500" /> General
+                        </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="medical">
+                       <MedicalAttentionForm 
+                            user={user} 
+                            locations={locations} 
+                            loading={formLoading}
+                            handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
+                            resetForms={formResetCounter > 0}
+                        />
+                    </TabsContent>
+                    <TabsContent value="missing">
+                        <MissingPersonForm 
+                            user={user} 
+                            locations={locations} 
+                            loading={formLoading}
+                            handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
+                            resetForms={formResetCounter > 0}
+                        />
+                    </TabsContent>
+                    <TabsContent value="general">
+                         <GeneralGrievanceForm
+                            user={user}
+                            loading={formLoading}
+                            handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
+                            resetForms={formResetCounter > 0}
+                        />
+                    </TabsContent>
+                </Tabs>
+            </CardContent>
+        </Card>
     </div>
   );
 }
+
