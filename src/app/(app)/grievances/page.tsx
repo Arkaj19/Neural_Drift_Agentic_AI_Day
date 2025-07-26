@@ -2,7 +2,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, User, Search, Stethoscope, MessageSquareWarning, RefreshCw, AlertTriangle, Image as ImageIcon, MapPin } from "lucide-react";
+import { MoreHorizontal, User, Search, Stethoscope, MessageSquareWarning, RefreshCw, AlertTriangle, Image as ImageIcon, MapPin, Ambulance, UserCheck } from "lucide-react";
 import Image from "next/image";
 
 export interface Grievance {
@@ -31,11 +31,13 @@ export interface Grievance {
     nanoseconds: number;
   };
   status: 'new' | 'resolved';
-  submittedBy?: string; // name of the user
-  personName?: string; // For missing person
-  lastSeen?: string; // For missing person
-  photoDataUri?: string; // For missing person image
-  location?: string; // For medical attention
+  submittedBy?: string; 
+  email?: string; // User's email to send notifications
+  personName?: string; 
+  lastSeen?: string; 
+  photoDataUri?: string; 
+  location?: string; 
+  actionTaken?: 'Deploy Ambulance' | 'Send Medical Staff';
 }
 
 const grievanceIcons = {
@@ -82,6 +84,44 @@ export default function GrievancesPage() {
       toast({
         title: "Error",
         description: "Could not resolve the grievance. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMedicalAction = async (grievance: Grievance, action: 'Deploy Ambulance' | 'Send Medical Staff') => {
+    if (!grievance.id || !grievance.email) {
+        toast({ title: "Error", description: "Grievance ID or user email is missing.", variant: "destructive" });
+        return;
+    }
+
+    const grievanceRef = doc(db, "grievances", grievance.id);
+    const notificationsRef = collection(db, "notifications");
+    
+    try {
+      // 1. Update the grievance
+      await updateDoc(grievanceRef, { 
+        status: 'resolved',
+        actionTaken: action,
+      });
+
+      // 2. Create a notification for the user
+      await addDoc(notificationsRef, {
+        userEmail: grievance.email,
+        message: `Your request for medical attention at ${grievance.location || 'the specified location'} has been addressed. Action taken: ${action}.`,
+        createdAt: serverTimestamp(),
+        read: false,
+      });
+
+      toast({
+        title: "Action Taken",
+        description: `Action "${action}" has been logged and the user has been notified.`,
+      });
+    } catch (error) {
+      console.error("Error taking medical action:", error);
+      toast({
+        title: "Error",
+        description: "Could not process the action. Please try again.",
         variant: "destructive",
       });
     }
@@ -144,9 +184,22 @@ export default function GrievancesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleResolve(grievance.id)}>
-                          Acknowledge & Resolve
-                        </DropdownMenuItem>
+                        {grievance.type === 'Medical Attention' ? (
+                          <>
+                            <DropdownMenuItem onClick={() => handleMedicalAction(grievance, 'Deploy Ambulance')}>
+                              <Ambulance className="mr-2 h-4 w-4" />
+                              Deploy Ambulance
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleMedicalAction(grievance, 'Send Medical Staff')}>
+                              <UserCheck className="mr-2 h-4 w-4" />
+                              Send Medical Staff
+                            </DropdownMenuItem>
+                          </>
+                        ) : (
+                          <DropdownMenuItem onClick={() => handleResolve(grievance.id)}>
+                            Acknowledge & Resolve
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </CardTitle>
@@ -157,7 +210,7 @@ export default function GrievancesPage() {
                 <CardContent>
                     <div className="flex gap-4">
                         {grievance.photoDataUri && (
-                            <div className="relative h-24 w-24 flex-shrink-0 rounded-md overflow-hidden">
+                            <div className="relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden">
                                 <Image src={grievance.photoDataUri} alt={grievance.personName || 'Missing person'} layout="fill" objectFit="cover" />
                             </div>
                         )}

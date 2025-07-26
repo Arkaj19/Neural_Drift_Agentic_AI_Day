@@ -9,14 +9,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { User, Search, Stethoscope, MessageSquareWarning, AlertTriangle, Mail, Phone, UserCircle, Image as ImageIcon, X } from "lucide-react";
+import { User, Search, Stethoscope, MessageSquareWarning, AlertTriangle, Mail, Phone, UserCircle, Image as ImageIcon, X, Bell, BellRing } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs, limit, getDocsFromCache } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, onSnapshot, query, where, getDocs, limit, doc, updateDoc } from 'firebase/firestore';
 import type { Grievance } from '@/app/(app)/grievances/page';
 import {
   Carousel,
@@ -28,6 +28,8 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 export interface UserProfile {
@@ -35,6 +37,15 @@ export interface UserProfile {
     fullName: string;
     email: string;
     phone: string;
+}
+
+interface Notification {
+  id: string;
+  message: string;
+  createdAt: {
+    seconds: number;
+  };
+  read: boolean;
 }
 
 interface GrievanceFormProps {
@@ -108,7 +119,7 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
     e.preventDefault();
     setLoading(true);
 
-    if (!user || !user.fullName) {
+    if (!user || !user.fullName || !user.email) {
         toast({
             title: "Submission Failed",
             description: "Could not identify the user. Please make sure you are logged in.",
@@ -125,6 +136,7 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
         status: 'new',
         submittedAt: serverTimestamp(),
         submittedBy: user.fullName,
+        email: user.email, // Include user's email
       };
 
       if (type === 'Medical Attention') {
@@ -277,7 +289,9 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
 }
 
 function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
-  if (reports.length === 0) return null;
+  if (reports.length === 0) {
+    return null;
+  }
 
   const formatTimestamp = (timestamp: { seconds: number }) => {
     if (!timestamp) return 'N/A';
@@ -305,7 +319,7 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
         <Carousel
           opts={{
             align: "start",
-            loop: true,
+            loop: reports.length > 1,
           }}
         >
           <CarouselContent>
@@ -319,7 +333,7 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
                             Reported by {report.submittedBy} • {report.submittedAt ? formatTimestamp(report.submittedAt) : 'a few moments ago'}
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="flex flex-row gap-4 text-sm">
+                    <CardContent className="flex flex-col sm:flex-row gap-4 text-sm">
                       {report.photoDataUri ? (
                         <div className="relative aspect-square w-32 h-32 rounded-md overflow-hidden flex-shrink-0">
                           <Image src={report.photoDataUri} alt={report.personName || 'Missing person'} layout="fill" objectFit="cover" />
@@ -345,8 +359,12 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
               </CarouselItem>
             ))}
           </CarouselContent>
-          <CarouselPrevious />
-          <CarouselNext />
+          {reports.length > 1 && (
+            <>
+              <CarouselPrevious />
+              <CarouselNext />
+            </>
+          )}
         </Carousel>
       </CardContent>
     </Card>
@@ -400,6 +418,64 @@ function UserProfileDisplay({ user, loading }: { user: UserProfile | null, loadi
     );
 }
 
+function Notifications({ user }: { user: UserProfile | null }) {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!user?.email) return;
+
+    const q = query(
+      collection(db, "notifications"),
+      where("userEmail", "==", user.email),
+      where("read", "==", false)
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const newNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+      setNotifications(newNotifications);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const markAsRead = async (id: string) => {
+    const notifRef = doc(db, "notifications", id);
+    try {
+      await updateDoc(notifRef, { read: true });
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      toast({ title: "Error", description: "Could not dismiss notification.", variant: "destructive" });
+    }
+  };
+
+  if (notifications.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4 mb-6">
+      <h2 className="text-2xl font-bold flex items-center gap-2"><BellRing /> Notifications</h2>
+      {notifications.map((notif) => (
+        <Alert key={notif.id} variant="default" className="border-accent">
+          <Bell className="h-4 w-4" />
+          <AlertTitle>Update on your request</AlertTitle>
+          <AlertDescription>{notif.message}</AlertDescription>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-2 right-2 h-6 w-6"
+            onClick={() => markAsRead(notif.id)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </Alert>
+      ))}
+    </div>
+  );
+}
+
+
 export default function UserDashboardPage() {
   const [formKey, setFormKey] = useState(0); 
   const [missingPersonReports, setMissingPersonReports] = useState<Grievance[]>([]);
@@ -407,7 +483,6 @@ export default function UserDashboardPage() {
   const [loadingUser, setLoadingUser] = useState(true);
 
   useEffect(() => {
-    // This effect runs only on the client-side
     const loggedInUserEmail = localStorage.getItem('userEmail');
 
     const fetchUser = async (email: string) => {
@@ -434,7 +509,7 @@ export default function UserDashboardPage() {
     if (loggedInUserEmail) {
         fetchUser(loggedInUserEmail);
     } else {
-        setLoadingUser(false); // No user is logged in
+        setLoadingUser(false); 
     }
 
     const qGrievances = query(collection(db, "grievances"), where("type", "==", "Missing Person"), where("status", "==", "new"));
@@ -449,10 +524,11 @@ export default function UserDashboardPage() {
   return (
     <div className="space-y-4">
         <UserProfileDisplay user={user} loading={loadingUser} />
+        <Notifications user={user} />
         <MissingPersonsCarousel reports={missingPersonReports} />
 
-        <h1 className="text-3xl font-bold">User Dashboard</h1>
-        <p className="text-muted-foreground">Report issues and request assistance.</p>
+        <h1 className="text-3xl font-bold">Report an Issue</h1>
+        <p className="text-muted-foreground">Let us know how we can help. Your reports are sent directly to the event staff.</p>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card>
                 <CardHeader>
