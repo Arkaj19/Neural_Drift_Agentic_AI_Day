@@ -119,8 +119,6 @@ export default function GrievancesPage() {
     }
 
     try {
-      await updateDoc(grievanceRef, { status: 'resolved', actionTaken: 'Acknowledged by Admin' });
-      
       let message = `Your grievance regarding "${grievance.type}" has been acknowledged and resolved.`;
       if (grievance.type === 'Missing Person') {
           message = `Your report for the missing person "${grievance.personName}" has been acknowledged. Our team is actively looking into it.`;
@@ -132,11 +130,21 @@ export default function GrievancesPage() {
         createdAt: serverTimestamp(),
         read: false,
       });
+
+      if (grievance.type === 'Missing Person') {
+        await deleteDoc(grievanceRef);
+        toast({
+          title: "Missing Person Report Resolved",
+          description: "The report has been removed from the active list.",
+        });
+      } else {
+         await updateDoc(grievanceRef, { status: 'resolved', actionTaken: 'Acknowledged by Admin' });
+         toast({
+          title: "Grievance Resolved",
+          description: "The grievance has been resolved and the user has been notified.",
+        });
+      }
       
-      toast({
-        title: "Grievance Resolved",
-        description: "The grievance has been resolved and the user has been notified.",
-      });
     } catch (error) {
       console.error("Error resolving grievance:", error);
       toast({
