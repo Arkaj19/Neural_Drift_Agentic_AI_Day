@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect } from 'react';
 import { GoogleMap, LoadScript, Marker, HeatmapLayer } from '@react-google-maps/api';

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/carousel";
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 export interface UserProfile {
@@ -45,11 +46,44 @@ interface GrievanceFormProps {
 function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
   const [details, setDetails] = useState('');
   const [personName, setPersonName] = useState('');
-  const [lastSeen, setLastSeen] = useState('');
+  const [lastSeenLocation, setLastSeenLocation] = useState('');
+  const [lastSeenHour, setLastSeenHour] = useState('12');
+  const [lastSeenMinute, setLastSeenMinute] = useState('00');
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
   const [photoDataUri, setPhotoDataUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (type === 'Missing Person') {
+      const fetchLocations = async () => {
+        setLoadingLocations(true);
+        try {
+          const response = await fetch('http://localhost:5000/api/feeds');
+          if (!response.ok) throw new Error('Failed to fetch locations');
+          const data = await response.json();
+          const locationData = Object.entries(data.feeds).map(([id, feed]: [string, any]) => ({
+            id: id,
+            name: feed.name,
+          }));
+          setLocations(locationData);
+        } catch (error) {
+          console.error(error);
+          toast({
+            title: "Error",
+            description: "Could not fetch camera locations.",
+            variant: "destructive",
+          });
+        } finally {
+          setLoadingLocations(false);
+        }
+      };
+      fetchLocations();
+    }
+  }, [type, toast]);
+
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -93,10 +127,19 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
       };
 
       if (type === 'Missing Person') {
+        if (!lastSeenLocation) {
+          toast({
+            title: "Missing Information",
+            description: "Please select a location.",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
         grievanceData = {
           ...grievanceData,
           personName,
-          lastSeen,
+          lastSeen: `${lastSeenLocation} at ${lastSeenHour}:${lastSeenMinute}`,
           photoDataUri,
         };
       }
@@ -110,7 +153,9 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
       onSuccess(); // Clear the form
       setDetails('');
       setPersonName('');
-      setLastSeen('');
+      setLastSeenLocation('');
+      setLastSeenHour('12');
+      setLastSeenMinute('00');
       clearPhoto();
 
     } catch (error) {
@@ -125,6 +170,9 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
     }
   };
 
+  const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
+  const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {type === 'Missing Person' && (
@@ -134,8 +182,39 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
             <Input id="personName" value={personName} onChange={(e) => setPersonName(e.target.value)} required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="lastSeen">Last Seen (Location & Time)</Label>
-            <Input id="lastSeen" value={lastSeen} onChange={(e) => setLastSeen(e.target.value)} required />
+            <Label>Last Seen</Label>
+            <div className="flex gap-2">
+              <div className="flex-grow">
+                <Select value={lastSeenLocation} onValueChange={setLastSeenLocation}>
+                  <SelectTrigger disabled={loadingLocations}>
+                    <SelectValue placeholder={loadingLocations ? "Loading locations..." : "Select a location"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map(loc => (
+                      <SelectItem key={loc.id} value={loc.name}>{loc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-1">
+                <Select value={lastSeenHour} onValueChange={setLastSeenHour}>
+                  <SelectTrigger className="w-[70px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-48">
+                    {hours.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                 <Select value={lastSeenMinute} onValueChange={setLastSeenMinute}>
+                  <SelectTrigger className="w-[70px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-48">
+                    {minutes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="photo">Photo</Label>
