@@ -108,13 +108,34 @@ export default function GrievancesPage() {
     };
   }, []);
 
-  const handleResolve = async (id: string) => {
-    const grievanceRef = doc(db, "grievances", id);
+  const handleResolve = async (grievance: Grievance) => {
+    const grievanceRef = doc(db, "grievances", grievance.id);
+    const notificationsRef = collection(db, "notifications");
+    const userEmail = grievance.email || grievance.submittedBy;
+
+    if (!userEmail) {
+        toast({ title: "Error", description: "User email is missing from this grievance.", variant: "destructive" });
+        return;
+    }
+
     try {
-      await updateDoc(grievanceRef, { status: 'resolved' });
+      await updateDoc(grievanceRef, { status: 'resolved', actionTaken: 'Acknowledged by Admin' });
+      
+      let message = `Your grievance regarding "${grievance.type}" has been acknowledged and resolved.`;
+      if (grievance.type === 'Missing Person') {
+          message = `Your report for the missing person "${grievance.personName}" has been acknowledged. Our team is actively looking into it.`;
+      }
+
+      await addDoc(notificationsRef, {
+        userEmail: userEmail,
+        message: message,
+        createdAt: serverTimestamp(),
+        read: false,
+      });
+      
       toast({
         title: "Grievance Resolved",
-        description: "The grievance has been marked as resolved and removed from the list.",
+        description: "The grievance has been resolved and the user has been notified.",
       });
     } catch (error) {
       console.error("Error resolving grievance:", error);
@@ -257,7 +278,7 @@ export default function GrievancesPage() {
                             </DropdownMenuSub>
                           </>
                         ) : (
-                          <DropdownMenuItem onClick={() => handleResolve(grievance.id)}>
+                          <DropdownMenuItem onClick={() => handleResolve(grievance)}>
                             Acknowledge & Resolve
                           </DropdownMenuItem>
                         )}
