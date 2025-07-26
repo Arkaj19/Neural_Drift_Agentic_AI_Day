@@ -127,7 +127,8 @@ export default function GrievancesPage() {
   };
 
   const handleMedicalAction = async (grievance: Grievance, action: string) => {
-    if (!grievance.id || !grievance.email) {
+    const userEmail = grievance.email || grievance.submittedBy;
+    if (!grievance.id || !userEmail) {
         toast({ title: "Error", description: "Grievance ID or user email is missing.", variant: "destructive" });
         return;
     }
@@ -142,7 +143,7 @@ export default function GrievancesPage() {
       });
 
       await addDoc(notificationsRef, {
-        userEmail: grievance.email,
+        userEmail: userEmail,
         message: `Your request for medical attention at ${grievance.location || 'the specified location'} has been addressed. Action taken: ${action}.`,
         createdAt: serverTimestamp(),
         read: false,
