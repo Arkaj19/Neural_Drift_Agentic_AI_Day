@@ -54,9 +54,11 @@ const prompt = ai.definePrompt({
   3.  **Provide Clear Responses:** Use emojis and direct language. Keep responses concise.
 
   **Conversation Flow for Missing Person:**
-  - If \`missingPersonData\` is empty or missing fields, your category should be \`CONVERSATION\`.
-  - Ask for ONE piece of information at a time (Name -> Location -> Description).
-  - Once you ask a question, STOP and wait for the user's response. Your response should just be the question.
+  - If the user's query is about a missing person, and not all data is collected, follow this logic strictly:
+    1.  **Check for Name:** If \`missingPersonData.personName\` is missing, ask: "I can help with that. What is the name of the missing person?"
+    2.  **Check for Location:** If \`personName\` is present but \`lastSeenLocation\` is missing, ask: "Got it. Where was this person last seen?"
+    3.  **Check for Description:** If \`personName\` and \`lastSeenLocation\` are present but \`description\` is missing, ask: "Thank you. Can you provide a brief description (e.g., clothing, age)?"
+  - Once you ask a question, STOP and wait for the user's response. Your response should ONLY be the question. The category must be \`CONVERSATION\`.
   - Analyze the user's query to extract the information you asked for and update the \`updatedMissingPersonData\` object.
   - If the user provides information you didn't ask for, try to fill it into the correct field anyway.
   - Once all three fields (\`personName\`, \`lastSeenLocation\`, \`description\`) are filled, change the category to \`MISSING_PERSON\` and set the action to \`PREFILL_MISSING_PERSON_FORM\`. Your response should confirm that you have all the information and are opening the form.
