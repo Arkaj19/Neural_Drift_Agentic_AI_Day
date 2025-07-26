@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Mail, Phone, AlertTriangle, Image as ImageIcon, X, Bell, BellRing, Clock } from "lucide-react";
+import { Mail, Phone, AlertTriangle, Image as ImageIcon, X, Bell, BellRing, Clock, Stethoscope, Search, MessageSquareWarning } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -29,17 +29,10 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createGrievance } from '@/services/grievance-service';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 export interface UserProfile {
     id: string;
@@ -55,6 +48,11 @@ interface Notification {
     seconds: number;
   };
   read: boolean;
+}
+
+interface Location {
+    name: string;
+    area: string;
 }
 
 function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
@@ -245,16 +243,95 @@ function Notifications({ user }: { user: UserProfile | null }) {
   );
 }
 
-function GrievanceForm({ user }: { user: UserProfile | null }) {
-    const { toast } = useToast();
-    const [loading, setLoading] = useState(false);
-    const [locations, setLocations] = useState<{name: string, area: string}[]>([]);
+const handleSubmit = async (
+    type: Grievance['type'],
+    details: Record<string, any>,
+    user: UserProfile | null,
+    setLoading: (loading: boolean) => void,
+    toast: (options: any) => void,
+    resetForms: () => void
+) => {
+    if (!user) {
+        toast({ title: "Error", description: "You must be logged in to submit a grievance.", variant: "destructive" });
+        return;
+    }
+    setLoading(true);
 
-    // State for Medical Attention
+    const lastSeen = details.lastSeenLocation ? `${details.lastSeenLocation} at ${details.lastSeenHour}:${details.lastSeenMinute}` : undefined;
+
+    try {
+        await createGrievance({
+            type,
+            submittedBy: user.email,
+            email: user.email,
+            ...details,
+            lastSeen,
+            photoFile: details.photo,
+        });
+
+        toast({
+            title: "Grievance Submitted",
+            description: `Your report for "${type}" has been received.`,
+        });
+        resetForms();
+    } catch (error) {
+        console.error("Error submitting grievance:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+        toast({ title: "Error", description: `Failed to submit grievance: ${errorMessage}`, variant: "destructive" });
+    } finally {
+        setLoading(false);
+    }
+};
+
+function MedicalAttentionForm({ user, locations, loading, handleSubmit, resetForms }: { user: UserProfile | null, locations: Location[], loading: boolean, handleSubmit: Function, resetForms: () => void }) {
     const [medicalDetails, setMedicalDetails] = useState('');
     const [medicalLocation, setMedicalLocation] = useState('');
 
-    // State for Missing Person
+    const onReset = () => {
+        setMedicalDetails('');
+        setMedicalLocation('');
+    }
+
+    useEffect(onReset, [resetForms]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Medical Attention</CardTitle>
+                <CardDescription>Report a medical emergency.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSubmit('Medical Attention', { details: medicalDetails, location: medicalLocation }, user);
+                }} className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="medical-location">Your Location</Label>
+                        <Select value={medicalLocation} onValueChange={setMedicalLocation} required>
+                            <SelectTrigger id="medical-location">
+                                <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {locations.map(loc => <SelectItem key={loc.area} value={loc.name}>{loc.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="medical-details">Details of Emergency</Label>
+                        <Textarea id="medical-details" placeholder="Describe the situation" value={medicalDetails} onChange={(e) => setMedicalDetails(e.target.value)} required />
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>Time will be recorded automatically.</span>
+                    </div>
+                    <Button type="submit" disabled={loading} className="w-full">Submit Medical Report</Button>
+                </form>
+            </CardContent>
+        </Card>
+    );
+}
+
+function MissingPersonForm({ user, locations, loading, handleSubmit, resetForms }: { user: UserProfile | null, locations: Location[], loading: boolean, handleSubmit: Function, resetForms: () => void }) {
     const [personName, setPersonName] = useState('');
     const [lastSeenLocation, setLastSeenLocation] = useState('');
     const [lastSeenHour, setLastSeenHour] = useState('');
@@ -264,35 +341,17 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
     const [photoPreview, setPhotoPreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // State for General Grievance
-    const [generalDetails, setGeneralDetails] = useState('');
+    const onReset = () => {
+        setPersonName('');
+        setLastSeenLocation('');
+        setLastSeenHour('');
+        setLastSeenMinute('');
+        setMissingDetails('');
+        setPhoto(null);
+        setPhotoPreview(null);
+    }
 
-    useEffect(() => {
-        const fetchLocations = async () => {
-            try {
-                const response = await fetch('http://localhost:5000/api/feeds');
-                if (!response.ok) {
-                    throw new Error(`API responded with status ${response.status}`);
-                }
-                const data = await response.json();
-                if (data.feeds) {
-                    const feedLocations = Object.values(data.feeds).map((feed: any) => ({
-                        name: feed.name,
-                        area: feed.area
-                    }));
-                    setLocations(feedLocations);
-                }
-            } catch (error) {
-                console.error("Failed to fetch locations:", error);
-                toast({ 
-                    title: "Could Not Load Locations", 
-                    description: error instanceof Error ? error.message : "The grievance forms may not work as expected. Please ensure the backend service is running.",
-                    variant: "destructive" 
-                });
-            }
-        };
-        fetchLocations();
-    }, [toast]);
+     useEffect(onReset, [resetForms]);
     
     const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
     const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
@@ -309,203 +368,112 @@ function GrievanceForm({ user }: { user: UserProfile | null }) {
         }
     };
 
-    const handleSubmit = async (
-        type: Grievance['type'],
-        details: Record<string, any>
-    ) => {
-        if (!user) {
-            toast({ title: "Error", description: "You must be logged in to submit a grievance.", variant: "destructive" });
-            return;
-        }
-        setLoading(true);
-        
-        const lastSeen = details.lastSeenLocation ? `${details.lastSeenLocation} at ${details.lastSeenHour}:${details.lastSeenMinute}` : undefined;
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Missing Person</CardTitle>
+                <CardDescription>Report a missing person.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                 <form onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSubmit('Missing Person', {
+                        personName,
+                        lastSeenLocation,
+                        lastSeenHour,
+                        lastSeenMinute,
+                        details: missingDetails,
+                        photo
+                    }, user);
+                }} className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="person-name">Missing Person's Name</Label>
+                        <Input id="person-name" value={personName} onChange={e => setPersonName(e.target.value)} required />
+                    </div>
+                     <div className="space-y-2">
+                        <Label>Last Seen</Label>
+                        <Select value={lastSeenLocation} onValueChange={setLastSeenLocation} required>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {locations.map(loc => <SelectItem key={loc.area} value={loc.name}>{loc.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <div className="grid grid-cols-2 gap-2">
+                            <Select value={lastSeenHour} onValueChange={setLastSeenHour} required>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Hour" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {hours.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Select value={lastSeenMinute} onValueChange={setLastSeenMinute} required>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Minute" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {minutes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="missing-details">Description (clothing, etc.)</Label>
+                        <Textarea id="missing-details" value={missingDetails} onChange={e => setMissingDetails(e.target.value)} required />
+                    </div>
+                     <div className="space-y-2">
+                        <Label>Photo (Optional)</Label>
+                        {photoPreview && (
+                            <div className="relative w-24 h-24">
+                                <Image src={photoPreview} alt="Preview" layout="fill" objectFit="cover" className="rounded-md" />
+                                <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => { setPhoto(null); setPhotoPreview(null); }}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        )}
+                        <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                            <ImageIcon className="mr-2 h-4 w-4" />
+                            {photo ? "Change Photo" : "Upload Photo"}
+                        </Button>
+                        <Input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoChange} />
+                    </div>
+                    <Button type="submit" disabled={loading} className="w-full">Submit Missing Person Report</Button>
+                </form>
+            </CardContent>
+        </Card>
+    );
+}
 
-        try {
-            await createGrievance({
-                type,
-                submittedBy: user.email,
-                email: user.email,
-                ...details,
-                lastSeen,
-                photoFile: photo, // Pass the file object directly
-            });
-
-            toast({
-                title: "Grievance Submitted",
-                description: `Your report for "${type}" has been received.`,
-            });
-            // Reset forms
-            setMedicalDetails('');
-            setMedicalLocation('');
-            setPersonName('');
-            setLastSeenLocation('');
-            setLastSeenHour('');
-            setLastSeenMinute('');
-            setMissingDetails('');
-            setPhoto(null);
-            setPhotoPreview(null);
-            setGeneralDetails('');
-
-        } catch (error) {
-            console.error("Error submitting grievance:", error);
-            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-            toast({ title: "Error", description: `Failed to submit grievance: ${errorMessage}`, variant: "destructive" });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (!user) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Please Log In</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p>You must be logged in to report an issue.</p>
-                </CardContent>
-            </Card>
-        );
+function GeneralGrievanceForm({ user, loading, handleSubmit, resetForms }: { user: UserProfile | null, loading: boolean, handleSubmit: Function, resetForms: () => void }) {
+    const [generalDetails, setGeneralDetails] = useState('');
+    
+    const onReset = () => {
+        setGeneralDetails('');
     }
 
+    useEffect(onReset, [resetForms]);
+
     return (
-        <div>
-            <CardHeader className="px-0">
-                <CardTitle>Report an Issue</CardTitle>
-                <CardDescription>
-                    Use the forms below to report a medical emergency, a missing person, or a general concern.
-                </CardDescription>
+        <Card>
+            <CardHeader>
+                <CardTitle>General Grievance</CardTitle>
+                <CardDescription>Report a general concern.</CardDescription>
             </CardHeader>
-            <div className="grid md:grid-cols-3 gap-6">
-                {/* Medical Attention */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Medical Attention</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            handleSubmit('Medical Attention', { details: medicalDetails, location: medicalLocation });
-                        }} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="medical-location">Your Location</Label>
-                                <Select value={medicalLocation} onValueChange={setMedicalLocation} required>
-                                    <SelectTrigger id="medical-location">
-                                        <SelectValue placeholder="Select location" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {locations.map(loc => <SelectItem key={loc.area} value={loc.name}>{loc.name}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="medical-details">Details of Emergency</Label>
-                                <Textarea id="medical-details" placeholder="Describe the situation" value={medicalDetails} onChange={(e) => setMedicalDetails(e.target.value)} required />
-                            </div>
-                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Clock className="h-4 w-4" />
-                                <span>Time will be recorded automatically.</span>
-                            </div>
-                            <Button type="submit" disabled={loading} className="w-full">Submit Medical Report</Button>
-                        </form>
-                    </CardContent>
-                </Card>
-
-                {/* Missing Person */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Missing Person</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                         <form onSubmit={(e) => {
-                            e.preventDefault();
-                            handleSubmit('Missing Person', {
-                                personName,
-                                lastSeenLocation,
-                                lastSeenHour,
-                                lastSeenMinute,
-                                details: missingDetails,
-                            });
-                        }} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="person-name">Missing Person's Name</Label>
-                                <Input id="person-name" value={personName} onChange={e => setPersonName(e.target.value)} required />
-                            </div>
-                             <div className="space-y-2">
-                                <Label>Last Seen</Label>
-                                <Select value={lastSeenLocation} onValueChange={setLastSeenLocation} required>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select location" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {locations.map(loc => <SelectItem key={loc.area} value={loc.name}>{loc.name}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Select value={lastSeenHour} onValueChange={setLastSeenHour} required>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Hour" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {hours.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                    <Select value={lastSeenMinute} onValueChange={setLastSeenMinute} required>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Minute" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {minutes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="missing-details">Description (clothing, etc.)</Label>
-                                <Textarea id="missing-details" value={missingDetails} onChange={e => setMissingDetails(e.target.value)} required />
-                            </div>
-                             <div className="space-y-2">
-                                <Label>Photo (Optional)</Label>
-                                {photoPreview && (
-                                    <div className="relative w-24 h-24">
-                                        <Image src={photoPreview} alt="Preview" layout="fill" objectFit="cover" className="rounded-md" />
-                                        <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => { setPhoto(null); setPhotoPreview(null); }}>
-                                            <X className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                )}
-                                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                                    <ImageIcon className="mr-2 h-4 w-4" />
-                                    {photo ? "Change Photo" : "Upload Photo"}
-                                </Button>
-                                <Input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoChange} />
-                            </div>
-                            <Button type="submit" disabled={loading} className="w-full">Submit Missing Person Report</Button>
-                        </form>
-                    </CardContent>
-                </Card>
-
-                {/* General Grievance */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>General Grievance</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            handleSubmit('General Grievance', { details: generalDetails });
-                        }} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="general-details">Describe your concern</Label>
-                                <Textarea id="general-details" className="h-52" placeholder="Please provide as much detail as possible." value={generalDetails} onChange={(e) => setGeneralDetails(e.target.value)} required />
-                            </div>
-                             <Button type="submit" disabled={loading} className="w-full">Submit General Grievance</Button>
-                        </form>
-                    </CardContent>
-                </Card>
-            </div>
-        </div>
+            <CardContent>
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSubmit('General Grievance', { details: generalDetails }, user);
+                }} className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="general-details">Describe your concern</Label>
+                        <Textarea id="general-details" className="h-52" placeholder="Please provide as much detail as possible." value={generalDetails} onChange={(e) => setGeneralDetails(e.target.value)} required />
+                    </div>
+                     <Button type="submit" disabled={loading} className="w-full">Submit General Grievance</Button>
+                </form>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -513,6 +481,15 @@ export default function UserDashboardPage() {
   const [missingPersonReports, setMissingPersonReports] = useState<Grievance[]>([]);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [formLoading, setFormLoading] = useState(false);
+  const { toast } = useToast();
+  const [formResetCounter, setFormResetCounter] = useState(0);
+
+  const resetAllForms = () => {
+    setFormResetCounter(prev => prev + 1);
+  };
+
 
   useEffect(() => {
     const loggedInUserEmail = localStorage.getItem('userEmail');
@@ -550,15 +527,110 @@ export default function UserDashboardPage() {
       setMissingPersonReports(reports);
     });
 
+    const fetchLocations = async () => {
+        try {
+            const response = await fetch('http://localhost:5000/api/feeds');
+            if (!response.ok) {
+                throw new Error(`API responded with status ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.feeds) {
+                const feedLocations = Object.values(data.feeds).map((feed: any) => ({
+                    name: feed.name,
+                    area: feed.area
+                }));
+                setLocations(feedLocations);
+            }
+        } catch (error) {
+            console.error("Failed to fetch locations:", error);
+            toast({ 
+                title: "Could Not Load Locations", 
+                description: error instanceof Error ? error.message : "The grievance forms may not work as expected. Please ensure the backend service is running.",
+                variant: "destructive" 
+            });
+        }
+    };
+    fetchLocations();
+
     return () => unsubscribeGrievances();
-  }, []);
+  }, [toast]);
+
+  if (loadingUser) {
+      return (
+        <div className="space-y-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-64 w-full" />
+        </div>
+      )
+  }
+
+  if (!user) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Please Log In</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p>You must be logged in to view this page and report issues.</p>
+            </CardContent>
+        </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">
         <UserProfileDisplay user={user} loading={loadingUser} />
         <Notifications user={user} />
         <MissingPersonsCarousel reports={missingPersonReports} />
-        <GrievanceForm user={user} />
+
+        <div>
+            <CardHeader className="px-0">
+                <CardTitle>Report an Issue</CardTitle>
+                <CardDescription>
+                    Use the tabs below to report a medical emergency, a missing person, or a general concern.
+                </CardDescription>
+            </CardHeader>
+            <Tabs defaultValue="medical" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="medical">
+                        <Stethoscope className="mr-2 h-4 w-4" /> Medical
+                    </TabsTrigger>
+                    <TabsTrigger value="missing">
+                        <Search className="mr-2 h-4 w-4" /> Missing Person
+                    </TabsTrigger>
+                    <TabsTrigger value="general">
+                        <MessageSquareWarning className="mr-2 h-4 w-4" /> General
+                    </TabsTrigger>
+                </TabsList>
+                <TabsContent value="medical">
+                   <MedicalAttentionForm 
+                        user={user} 
+                        locations={locations} 
+                        loading={formLoading}
+                        handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
+                        resetForms={formResetCounter > 0}
+                    />
+                </TabsContent>
+                <TabsContent value="missing">
+                    <MissingPersonForm 
+                        user={user} 
+                        locations={locations} 
+                        loading={formLoading}
+                        handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
+                        resetForms={formResetCounter > 0}
+                    />
+                </TabsContent>
+                <TabsContent value="general">
+                     <GeneralGrievanceForm
+                        user={user}
+                        loading={formLoading}
+                        handleSubmit={(type: any, details: any, user: any) => handleSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
+                        resetForms={formResetCounter > 0}
+                    />
+                </TabsContent>
+            </Tabs>
+        </div>
     </div>
   );
 }
