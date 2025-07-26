@@ -22,21 +22,19 @@ export const createGrievance = async (data: GrievanceData) => {
     let photoDataUri = null;
 
     if (data.photoFile) {
-        const reader = new FileReader();
-        const fileReadPromise = new Promise<string>((resolve, reject) => {
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-        });
-        reader.readAsDataURL(data.photoFile);
-        
         try {
-            const dataUrl = await fileReadPromise;
+            // Convert file to buffer and then to data URL on the server
+            const fileBuffer = await data.photoFile.arrayBuffer();
+            const base64 = Buffer.from(fileBuffer).toString('base64');
+            const dataUrl = `data:${data.photoFile.type};base64,${base64}`;
+
             const storageRef = ref(storage, `grievance-photos/${Date.now()}-${data.photoFile.name}`);
             const snapshot = await uploadString(storageRef, dataUrl, 'data_url');
             photoDataUri = await getDownloadURL(snapshot.ref);
         } catch (error) {
             console.error("Error uploading photo:", error);
             // Decide if you want to proceed without the photo or throw an error
+            throw new Error("Failed to upload photo.");
         }
     }
     
