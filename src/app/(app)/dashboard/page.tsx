@@ -1,3 +1,4 @@
+
 'use client';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +30,12 @@ import {
   Phone,
   User,
   PlusCircle,
+  Stethoscope,
+  Search,
+  MessageSquareWarning,
+  AlertOctagon,
 } from "lucide-react";
-import { collection, onSnapshot, doc, addDoc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, addDoc, updateDoc, query, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
   Dialog,
@@ -51,13 +56,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import type { Grievance } from "@/app/(app)/grievances/page";
 
 
 const metricIcons: { [key: string]: React.ElementType } = {
     "Total Crowd": Users,
     "Active Guards": ShieldAlert,
     "Active Alerts": Signal,
-    "System Status": Signal,
+    "Open Grievances": AlertOctagon,
 };
 
 const getStatusBadgeVariant = (status: "Active" | "Alert" | "Standby") => {
@@ -165,6 +171,13 @@ export default function DashboardPage() {
   const [metrics, setMetrics] = useState(keyMetrics);
   const [isAddGuardOpen, setAddGuardOpen] = useState(false);
   const { toast } = useToast();
+  const [grievanceCounts, setGrievanceCounts] = useState({
+    total: 0,
+    medical: 0,
+    missing: 0,
+    general: 0,
+  });
+
 
   useEffect(() => {
     // Fetch guards data
@@ -255,10 +268,25 @@ export default function DashboardPage() {
     fetchAlerts();
     const alertsInterval = setInterval(fetchAlerts, 10000); // Poll every 10 seconds
 
+     // Fetch open grievances data
+    const grievancesQuery = query(collection(db, "grievances"), where("status", "==", "new"));
+    const grievancesUnsubscribe = onSnapshot(grievancesQuery, (snapshot) => {
+      const counts = { total: 0, medical: 0, missing: 0, general: 0 };
+      snapshot.forEach(doc => {
+        const grievance = doc.data() as Grievance;
+        counts.total++;
+        if (grievance.type === 'Medical Attention') counts.medical++;
+        else if (grievance.type === 'Missing Person') counts.missing++;
+        else if (grievance.type === 'General Grievance') counts.general++;
+      });
+      setGrievanceCounts(counts);
+    });
+
     return () => {
       guardsUnsubscribe();
       crowdUnsubscribe();
       clearInterval(alertsInterval);
+      grievancesUnsubscribe();
     };
   }, []);
 
@@ -286,9 +314,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Object.entries(metrics).map(([title, data]) => {
           const Icon = metricIcons[title];
-          if (!Icon) {
-            return null;
-          }
+          if (!Icon) return null;
           return (
             <Card key={title}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -317,6 +343,29 @@ export default function DashboardPage() {
             </Card>
           );
         })}
+         <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Open Grievances</CardTitle>
+                <AlertOctagon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{grievanceCounts.total}</div>
+                <div className="text-xs text-muted-foreground grid grid-cols-3 gap-2 mt-2">
+                    <div className="flex items-center gap-1">
+                        <Stethoscope className="h-3 w-3" />
+                        <span>Medical: {grievanceCounts.medical}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <Search className="h-3 w-3" />
+                        <span>Missing: {grievanceCounts.missing}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <MessageSquareWarning className="h-3 w-3" />
+                        <span>General: {grievanceCounts.general}</span>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
       </div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
