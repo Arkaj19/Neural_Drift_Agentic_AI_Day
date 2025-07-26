@@ -1,22 +1,19 @@
 
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Mail, Phone, AlertTriangle, Image as ImageIcon, X, Bell, BellRing, Clock, Stethoscope, Search, MessageSquareWarning, Bot, Send } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { AlertTriangle, Bell, BellRing, X, Stethoscope, Search, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, where, getDocs, limit, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, getDocs, limit, doc, updateDoc } from 'firebase/firestore';
 import type { Grievance } from '@/app/(app)/grievances/page';
 import {
   Carousel,
@@ -25,25 +22,20 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createGrievance } from '@/services/grievance-service';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import { crowdManagementChatbot, type CrowdManagementChatbotOutput } from '@/ai/flows/crowd-management-chatbot';
+import { UserProfile } from '@/hooks/use-user-profile';
+import MedicalAttentionForm from '@/components/user-dashboard/medical-form';
+import MissingPersonForm, { type MissingPersonFormData } from '@/components/user-dashboard/missing-person-form';
+import Chatbot from '@/components/user-dashboard/chatbot';
 import { useRouter } from 'next/navigation';
-import { nanoid } from 'nanoid';
 
-
-export interface UserProfile {
-    id: string;
-    fullName: string;
-    email: string;
-    phone: string;
+export interface Location {
+    name: string;
+    area: string;
 }
 
 interface Notification {
@@ -53,11 +45,6 @@ interface Notification {
     seconds: number;
   };
   read: boolean;
-}
-
-interface Location {
-    name: string;
-    area: string;
 }
 
 function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
@@ -120,9 +107,6 @@ function MissingPersonsCarousel({ reports }: { reports: Grievance[] }) {
                         <p className="text-muted-foreground">
                             <span className="font-semibold">Reported by:</span> {report.submittedBy} • {report.submittedAt ? formatTimestamp(report.submittedAt) : 'a few moments ago'}
                         </p>
-                        <div className="mt-2">
-                          <Badge variant="secondary" className='bg-gray-200 dark:bg-gray-700'>Black hoodie</Badge>
-                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -213,8 +197,11 @@ const handleGrievanceSubmit = async (
         return;
     }
     setLoading(true);
-
-    const lastSeen = details.lastSeenLocation ? `${details.lastSeenLocation} at ${details.lastSeenHour}:${details.lastSeenMinute}` : undefined;
+    
+    // Handle cases where time might not be provided for Missing Person
+    const lastSeen = (details.lastSeenLocation && details.lastSeenHour && details.lastSeenMinute) 
+        ? `${details.lastSeenLocation} at ${details.lastSeenHour}:${details.lastSeenMinute}` 
+        : details.lastSeenLocation;
 
     try {
         await createGrievance({
@@ -240,262 +227,6 @@ const handleGrievanceSubmit = async (
     }
 };
 
-function MedicalAttentionForm({ user, locations, loading, handleSubmit, resetForms }: { user: UserProfile | null, locations: Location[], loading: boolean, handleSubmit: Function, resetForms: () => void }) {
-    const [medicalDetails, setMedicalDetails] = useState('');
-    const [medicalLocation, setMedicalLocation] = useState('');
-
-    const onReset = () => {
-        setMedicalDetails('');
-        setMedicalLocation('');
-    }
-
-    useEffect(onReset, [resetForms]);
-
-    return (
-        <div>
-            <CardHeader className="px-1 pt-4">
-                <CardTitle>Medical Attention</CardTitle>
-                <CardDescription>Report a medical emergency.</CardDescription>
-            </CardHeader>
-            <CardContent className="px-1">
-                <form onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSubmit('Medical Attention', { details: medicalDetails, location: medicalLocation }, user);
-                }} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="medical-location">Your Location</Label>
-                        <Select value={medicalLocation} onValueChange={setMedicalLocation} required>
-                            <SelectTrigger id="medical-location">
-                                <SelectValue placeholder="Select location" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {locations.map(loc => <SelectItem key={loc.area} value={loc.name}>{loc.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="medical-details">Details of Emergency</Label>
-                        <Textarea id="medical-details" placeholder="Describe the situation" value={medicalDetails} onChange={(e) => setMedicalDetails(e.target.value)} required />
-                    </div>
-                    <Button type="submit" disabled={loading} className="w-full">Submit Medical Report</Button>
-                </form>
-            </CardContent>
-        </div>
-    );
-}
-
-function MissingPersonForm({ user, locations, loading, handleSubmit, resetForms }: { user: UserProfile | null, locations: Location[], loading: boolean, handleSubmit: Function, resetForms: () => void }) {
-    const [personName, setPersonName] = useState('');
-    const [lastSeenLocation, setLastSeenLocation] = useState('');
-    const [lastSeenHour, setLastSeenHour] = useState('');
-    const [lastSeenMinute, setLastSeenMinute] = useState('');
-    const [missingDetails, setMissingDetails] = useState('');
-    const [photo, setPhoto] = useState<File | null>(null);
-    const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const onReset = () => {
-        setPersonName('');
-        setLastSeenLocation('');
-        setLastSeenHour('');
-        setLastSeenMinute('');
-        setMissingDetails('');
-        setPhoto(null);
-        setPhotoPreview(null);
-    }
-
-     useEffect(onReset, [resetForms]);
-    
-    const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
-    const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
-
-    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setPhoto(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setPhotoPreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    return (
-        <div>
-            <CardHeader className="px-1 pt-4">
-                <CardTitle>Missing Person</CardTitle>
-                <CardDescription>Report a missing person.</CardDescription>
-            </CardHeader>
-            <CardContent className="px-1">
-                 <form onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSubmit('Missing Person', {
-                        personName,
-                        lastSeenLocation,
-                        lastSeenHour,
-                        lastSeenMinute,
-                        details: missingDetails,
-                        photo
-                    }, user);
-                }} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="person-name">Missing Person's Name</Label>
-                        <Input id="person-name" value={personName} onChange={e => setPersonName(e.target.value)} required />
-                    </div>
-                     <div className="space-y-2">
-                        <Label>Last Seen</Label>
-                        <Select value={lastSeenLocation} onValueChange={setLastSeenLocation} required>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select location" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {locations.map(loc => <SelectItem key={loc.area} value={loc.name}>{loc.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <div className="grid grid-cols-2 gap-2">
-                            <Select value={lastSeenHour} onValueChange={setLastSeenHour} required>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Hour" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {hours.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Select value={lastSeenMinute} onValueChange={setLastSeenMinute} required>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Minute" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {minutes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="missing-details">Description (clothing, etc.)</Label>
-                        <Textarea id="missing-details" value={missingDetails} onChange={e => setMissingDetails(e.target.value)} required />
-                    </div>
-                     <div className="space-y-2">
-                        <Label>Photo (Optional)</Label>
-                        {photoPreview && (
-                            <div className="relative w-24 h-24">
-                                <Image src={photoPreview} alt="Preview" layout="fill" objectFit="cover" className="rounded-md" />
-                                <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => { setPhoto(null); setPhotoPreview(null); }}>
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        )}
-                        <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                            <ImageIcon className="mr-2 h-4 w-4" />
-                            {photo ? "Change Photo" : "Upload Photo"}
-                        </Button>
-                        <Input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoChange} />
-                    </div>
-                    <Button type="submit" disabled={loading} className="w-full">Submit Missing Person Report</Button>
-                </form>
-            </CardContent>
-        </div>
-    );
-}
-
-interface ChatMessage {
-    id: string;
-    role: 'user' | 'bot';
-    text: string;
-}
-
-function Chatbot({ handleNavigation }: { handleNavigation: (path: string, tab?: string) => void }) {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [input, setInput] = useState('');
-    const [loading, setLoading] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-
-    useEffect(scrollToBottom, [messages]);
-
-    useEffect(() => {
-        // Initial bot message
-        setMessages([{ id: nanoid(), role: 'bot', text: "How can I help you today?" }]);
-    }, []);
-
-    const handleChatSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!input.trim() || loading) return;
-
-        const userMessage: ChatMessage = { id: nanoid(), role: 'user', text: input };
-        setMessages(prev => [...prev, userMessage]);
-        setInput('');
-        setLoading(true);
-
-        try {
-            const result = await crowdManagementChatbot({ query: input });
-            const botMessage: ChatMessage = { id: nanoid(), role: 'bot', text: result.response };
-            setMessages(prev => [...prev, botMessage]);
-
-            // Handle navigation actions
-            if (result.action) {
-                switch (result.action) {
-                    case 'NAVIGATE_TO_EMERGENCY_FORM':
-                        handleNavigation('user/dashboard', 'medical');
-                        break;
-                    case 'NAVIGATE_TO_MISSING_PERSON_FORM':
-                        handleNavigation('user/dashboard', 'missing');
-                        break;
-                    case 'NAVIGATE_TO_MAP':
-                        handleNavigation('/map-view');
-                        break;
-                }
-            }
-        } catch (error) {
-            console.error("Chatbot error:", error);
-            const errorMessage: ChatMessage = { id: nanoid(), role: 'bot', text: "Sorry, I'm having trouble connecting. Please try again later." };
-            setMessages(prev => [...prev, errorMessage]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div>
-            <CardHeader className="px-1 pt-4">
-                <CardTitle>Drishti Assistant</CardTitle>
-                <CardDescription>Ask for help or directions.</CardDescription>
-            </CardHeader>
-            <CardContent className="px-1">
-                <div className="h-[400px] flex flex-col">
-                    <div className="flex-grow space-y-4 overflow-y-auto p-4 border rounded-md bg-muted/50">
-                        {messages.map((msg) => (
-                            <div key={msg.id} className={cn("flex items-start gap-3", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                                {msg.role === 'bot' && <Avatar className="w-8 h-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>}
-                                <div className={cn("max-w-xs rounded-lg px-4 py-2 whitespace-pre-wrap", msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background')}>
-                                    {msg.text}
-                                </div>
-                            </div>
-                        ))}
-                         <div ref={messagesEndRef} />
-                    </div>
-                    <form onSubmit={handleChatSubmit} className="flex items-center gap-2 pt-4">
-                        <Input
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Type your message..."
-                            disabled={loading}
-                        />
-                        <Button type="submit" disabled={loading}>
-                            {loading ? <Skeleton className="h-5 w-5 rounded-full animate-spin" /> : <Send />}
-                        </Button>
-                    </form>
-                </div>
-            </CardContent>
-        </div>
-    );
-}
-
-
 export default function UserDashboardPage() {
   const [missingPersonReports, setMissingPersonReports] = useState<Grievance[]>([]);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -506,7 +237,7 @@ export default function UserDashboardPage() {
   const [formResetCounter, setFormResetCounter] = useState(0);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("chatbot");
-
+  const [prefilledData, setPrefilledData] = useState<Partial<MissingPersonFormData> | null>(null);
 
   const resetAllForms = () => {
     setFormResetCounter(prev => prev + 1);
@@ -522,6 +253,10 @@ export default function UserDashboardPage() {
     }
   };
 
+  const handlePrefillAndNavigate = useCallback((data: Partial<MissingPersonFormData>) => {
+    setPrefilledData(data);
+    setActiveTab("missing");
+  }, []);
 
   useEffect(() => {
     const loggedInUserEmail = localStorage.getItem('userEmail');
@@ -619,7 +354,7 @@ export default function UserDashboardPage() {
             <CardHeader>
                 <CardTitle>Report an Issue</CardTitle>
                 <CardDescription>
-                    Use the tabs below to report a medical emergency, a missing person, or to chat with our assistant.
+                    Use the tabs below to report a medical emergency or a missing person, or to chat with our assistant.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -641,7 +376,7 @@ export default function UserDashboardPage() {
                             locations={locations} 
                             loading={formLoading}
                             handleSubmit={(type: any, details: any, user: any) => handleGrievanceSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
-                            resetForms={formResetCounter > 0}
+                            resetCounter={formResetCounter}
                         />
                     </TabsContent>
                     <TabsContent value="missing">
@@ -650,11 +385,15 @@ export default function UserDashboardPage() {
                             locations={locations} 
                             loading={formLoading}
                             handleSubmit={(type: any, details: any, user: any) => handleGrievanceSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
-                            resetForms={formResetCounter > 0}
+                            resetCounter={formResetCounter}
+                            prefilledData={prefilledData}
                         />
                     </TabsContent>
                     <TabsContent value="chatbot">
-                         <Chatbot handleNavigation={handleNavigation} />
+                         <Chatbot 
+                            handleNavigation={handleNavigation} 
+                            handlePrefillAndNavigate={handlePrefillAndNavigate}
+                         />
                     </TabsContent>
                 </Tabs>
             </CardContent>
