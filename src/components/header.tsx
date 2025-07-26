@@ -1,3 +1,5 @@
+'use client';
+
 import { Icons } from "./icons";
 import Clock from "./clock";
 import { Button } from "./ui/button";
