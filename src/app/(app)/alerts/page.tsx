@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -84,6 +84,8 @@ export default function AlertsPage() {
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [sortBy, setSortBy] = useState<'timestamp' | 'priority' | 'count'>('timestamp');
   const [filterLevel, setFilterLevel] = useState<'all' | 'critical' | 'warning'>('all');
+  const intervalRef = useRef<NodeJS.Timeout>();
+
 
   const fetchAlerts = async () => {
     try {
@@ -99,20 +101,34 @@ export default function AlertsPage() {
       setAlerts(data.alerts);
       setLastUpdated(data.timestamp);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch alerts');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch alerts';
+      setError(errorMessage);
       console.error('Error fetching alerts:', err);
+      // Stop polling on error
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
+  const startPolling = () => {
+    // Clear any existing interval before starting a new one
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
     fetchAlerts();
-    
-    // Set up polling for real-time updates every 10 seconds
-    const interval = setInterval(fetchAlerts, 10000);
-    
-    return () => clearInterval(interval);
+    intervalRef.current = setInterval(fetchAlerts, 10000);
+  };
+
+  useEffect(() => {
+    startPolling();
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, []);
 
   const formatTimestamp = (timestamp: string) => {
@@ -152,7 +168,7 @@ export default function AlertsPage() {
 
   const handleRefresh = () => {
     setLoading(true);
-    fetchAlerts();
+    startPolling();
   };
 
   if (loading && alerts.length === 0) {
@@ -178,13 +194,16 @@ export default function AlertsPage() {
             Retry
           </Button>
         </div>
-        <Card className="border-red-500 bg-red-50 dark:bg-red-950">
+        <Card className="border-red-500 bg-red-900/10">
           <CardContent className="p-6">
-            <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+            <div className="flex items-center gap-2 text-red-400">
               <AlertTriangle className="h-5 w-5" />
               <span className="font-medium">Error loading alerts</span>
             </div>
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Could not connect to the alerts service. Please ensure the backend is running and try again.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/70">Details: {error}</p>
           </CardContent>
         </Card>
       </div>
