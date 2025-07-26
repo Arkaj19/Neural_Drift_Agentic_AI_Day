@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import {
   Card,
@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { User, Search, Stethoscope, MessageSquareWarning, AlertTriangle, Mail, Phone, UserCircle, Image as ImageIcon } from "lucide-react";
+import { User, Search, Stethoscope, MessageSquareWarning, AlertTriangle, Mail, Phone, UserCircle, Image as ImageIcon, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
   const [lastSeen, setLastSeen] = useState('');
   const [photoDataUri, setPhotoDataUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,6 +61,13 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
       reader.readAsDataURL(file);
     }
   };
+  
+  const clearPhoto = () => {
+    setPhotoDataUri(null);
+    if(fileInputRef.current) {
+        fileInputRef.current.value = "";
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +111,7 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
       setDetails('');
       setPersonName('');
       setLastSeen('');
-      setPhotoDataUri(null);
+      clearPhoto();
 
     } catch (error) {
       console.error('Error submitting grievance:', error);
@@ -131,10 +139,13 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="photo">Photo</Label>
-            <Input id="photo" type="file" onChange={handlePhotoChange} accept="image/*" />
+            <Input id="photo" type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/*" />
             {photoDataUri && (
                 <div className="mt-2 relative h-32 w-32">
                     <Image src={photoDataUri} alt="Preview" layout="fill" objectFit="cover" className="rounded-md" />
+                     <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={clearPhoto}>
+                        <X className="h-4 w-4" />
+                     </Button>
                 </div>
             )}
           </div>
