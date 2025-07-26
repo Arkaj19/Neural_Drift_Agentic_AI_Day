@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, User, Search, Stethoscope, MessageSquareWarning, RefreshCw, AlertTriangle, Image as ImageIcon } from "lucide-react";
+import { MoreHorizontal, User, Search, Stethoscope, MessageSquareWarning, RefreshCw, AlertTriangle, Image as ImageIcon, MapPin } from "lucide-react";
 import Image from "next/image";
 
 export interface Grievance {
@@ -35,6 +35,7 @@ export interface Grievance {
   personName?: string; // For missing person
   lastSeen?: string; // For missing person
   photoDataUri?: string; // For missing person image
+  location?: string; // For medical attention
 }
 
 const grievanceIcons = {
@@ -160,14 +161,20 @@ export default function GrievancesPage() {
                                 <Image src={grievance.photoDataUri} alt={grievance.personName || 'Missing person'} layout="fill" objectFit="cover" />
                             </div>
                         )}
-                        <div className="flex-grow">
+                        <div className="flex-grow space-y-2">
                             {grievance.type === 'Missing Person' && (
                                 <div className="space-y-2 text-sm">
                                 <p><strong>Name:</strong> {grievance.personName}</p>
                                 <p><strong>Last Seen:</strong> {grievance.lastSeen}</p>
                                 </div>
                             )}
-                            <p className="text-sm text-muted-foreground mt-2">{grievance.details}</p>
+                             {grievance.type === 'Medical Attention' && grievance.location && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <MapPin className="h-4 w-4" />
+                                    <strong>Location:</strong> {grievance.location}
+                                </div>
+                            )}
+                            <p className="text-sm text-muted-foreground">{grievance.details}</p>
                         </div>
                     </div>
                 </CardContent>

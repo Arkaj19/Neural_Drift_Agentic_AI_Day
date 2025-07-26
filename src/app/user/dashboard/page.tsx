@@ -49,6 +49,7 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
   const [lastSeenLocation, setLastSeenLocation] = useState('');
   const [lastSeenHour, setLastSeenHour] = useState('12');
   const [lastSeenMinute, setLastSeenMinute] = useState('00');
+  const [location, setLocation] = useState('');
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [photoDataUri, setPhotoDataUri] = useState<string | null>(null);
@@ -57,7 +58,7 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (type === 'Missing Person') {
+    if (type === 'Missing Person' || type === 'Medical Attention') {
       const fetchLocations = async () => {
         setLoadingLocations(true);
         try {
@@ -126,6 +127,22 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
         submittedBy: user.fullName,
       };
 
+      if (type === 'Medical Attention') {
+        if (!location) {
+          toast({
+            title: "Missing Information",
+            description: "Please select a location.",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+        grievanceData = {
+          ...grievanceData,
+          location,
+        };
+      }
+
       if (type === 'Missing Person') {
         if (!lastSeenLocation) {
           toast({
@@ -156,6 +173,7 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
       setLastSeenLocation('');
       setLastSeenHour('12');
       setLastSeenMinute('00');
+      setLocation('');
       clearPhoto();
 
     } catch (error) {
@@ -175,6 +193,21 @@ function GrievanceForm({ type, onSuccess, user }: GrievanceFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {type === 'Medical Attention' && (
+        <div className="space-y-2">
+            <Label htmlFor="location">Location</Label>
+             <Select value={location} onValueChange={setLocation}>
+                  <SelectTrigger disabled={loadingLocations}>
+                    <SelectValue placeholder={loadingLocations ? "Loading locations..." : "Select a location"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map(loc => (
+                      <SelectItem key={loc.id} value={loc.name}>{loc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+        </div>
+      )}
       {type === 'Missing Person' && (
         <>
           <div className="space-y-2">
