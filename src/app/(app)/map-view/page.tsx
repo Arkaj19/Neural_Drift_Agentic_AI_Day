@@ -1,373 +1,342 @@
 
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { 
-  Maximize, 
-  RefreshCw, 
-  MapPin, 
-  Users, 
-  AlertTriangle,
-  Zap,
-  TrendingUp,
-  Loader2,
-  Wifi,
-  WifiOff
-} from "lucide-react";
-import * as maptilersdk from '@maptiler/sdk';
-import '@maptiler/sdk/dist/maptiler-sdk.css';
+import React, { useState, useEffect } from 'react';
+import { GoogleMap, LoadScript, Marker, HeatmapLayer } from '@react-google-maps/api';
+import { collection, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-interface FeedLocation {
-  feed_id: string;
-  name: string;
-  current_count: number;
-  max_capacity: number;
-  density_percentage: number;
-  alert_level: 'normal' | 'warning' | 'critical';
-  last_updated: string;
-  location: {
-    lat: number;
-    lng: number;
+const containerStyle = {
+  width: '100%',
+  height: '100vh'
+};
+
+const statusStyle: React.CSSProperties = {
+  position: 'absolute',
+  bottom: '10px',
+  left: '10px',
+  zIndex: 1000,
+  padding: '8px 12px',
+  backgroundColor: 'rgba(0,0,0,0.7)',
+  color: 'white',
+  borderRadius: '5px',
+  fontSize: '12px'
+};
+
+// Calculate center point from location coordinates
+const calculateCenter = (locations: any[]) => {
+  if (locations.length === 0) return { lat: 28.6141, lng: 77.2092 };
+  
+  const sum = locations.reduce((acc, item) => ({
+    lat: acc.lat + parseFloat(item.location.lat),
+    lng: acc.lng + parseFloat(item.location.lng)
+  }), { lat: 0, lng: 0 });
+  
+  return {
+    lat: sum.lat / locations.length,
+    lng: sum.lng / locations.length
   };
-  area: string;
-}
-
-interface FeedsResponse {
-  feeds: Record<string, FeedLocation>;
-  total_count: number;
-  timestamp: string;
-}
-
-const alertLevelConfig = {
-  critical: {
-    color: "bg-red-500",
-    textColor: "text-red-400",
-    icon: Zap,
-    label: "Critical Alert",
-    markerColor: "#f54242"
-  },
-  warning: {
-    color: "bg-yellow-500", 
-    textColor: "text-yellow-400",
-    icon: AlertTriangle,
-    label: "Warning",
-    markerColor: "#f5a742"
-  },
-  normal: {
-    color: "bg-green-500",
-    textColor: "text-green-400", 
-    icon: TrendingUp,
-    label: "Normal",
-    markerColor: "#42f54b"
-  }
 };
 
-const getStatusColor = (alertLevel: string) => {
-  return alertLevelConfig[alertLevel as keyof typeof alertLevelConfig]?.textColor || "text-gray-400";
+// Default center based on Delhi coordinates
+const defaultCenter = {
+  lat: 28.6141,
+  lng: 77.2092
 };
 
-const getProgressColor = (capacity: number) => {
-  if (capacity > 90) return "bg-red-500";
-  if (capacity > 75) return "bg-yellow-500";
-  return "bg-green-500";
-};
-
-// Interactive Map Component
-const InteractiveMap = ({ feeds }: {
-  feeds: FeedLocation[];
-}) => {
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<maptilersdk.Map | null>(null);
-  const [lng] = useState(77.6353);
-  const [lat] = useState(12.9667);
-  const [zoom] = useState(14);
-  const apiKey = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
-
-  useEffect(() => {
-    if (!apiKey) {
-      console.error("MapTiler API key is missing. Please add it to your .env file.");
-      return;
-    }
-
-    if (map.current || !mapContainer.current) return; // stops map from intializing more than once
-
-    maptilersdk.config.apiKey = apiKey;
-
-    map.current = new maptilersdk.Map({
-      container: mapContainer.current,
-      style: maptilersdk.MapStyle.STREET,
-      center: [lng, lat],
-      zoom: zoom
-    });
-
-    feeds.forEach(feed => {
-      const el = document.createElement('div');
-      el.className = `p-2 rounded-full shadow-lg border-2 border-white ${alertLevelConfig[feed.alert_level]?.color || 'bg-gray-500'}`;
-      el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
-
-      const popup = new maptilersdk.Popup({ closeButton: false, offset: 25 })
-        .setHTML(`
-          <div class="p-2 bg-card text-card-foreground rounded-lg shadow-xl border min-w-56">
-              <h4 class="font-semibold text-base mb-2 text-center">${feed.name}</h4>
-              <div class="grid grid-cols-2 gap-2 text-sm">
-                  <div><p class="text-muted-foreground">Count</p><p class="font-semibold">${feed.current_count}/${feed.max_capacity}</p></div>
-                  <div><p class="text-muted-foreground">Density</p><p class="font-semibold">${feed.density_percentage}%</p></div>
-                  <div><p class="text-muted-foreground">Status</p><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${feed.alert_level === 'critical' ? 'bg-destructive text-destructive-foreground' : feed.alert_level === 'warning' ? 'bg-yellow-500 text-black' : 'bg-secondary text-secondary-foreground'}">${alertLevelConfig[feed.alert_level].label}</span></div>
-                  <div><p class="text-muted-foreground">Area</p><p class="font-semibold capitalize">${feed.area.replace('_', ' ')}</p></div>
-              </div>
-              <div class="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                  📍 ${feed.location.lat.toFixed(4)}, ${feed.location.lng.toFixed(4)}
-              </div>
-          </div>
-        `);
-
-      new maptilersdk.Marker({ 
-          element: el,
-          color: alertLevelConfig[feed.alert_level].markerColor 
-      })
-      .setLngLat([feed.location.lng, feed.location.lat])
-      .setPopup(popup)
-      .addTo(map.current!);
-    });
-  }, [apiKey, lat, lng, zoom, feeds]);
-
-  if (!apiKey) {
-    return (
-        <div className="aspect-video w-full bg-muted rounded-lg flex flex-col items-center justify-center text-center p-4">
-            <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-            <h3 className="text-xl font-semibold mb-2">MapTiler API Key Missing</h3>
-            <p className="text-muted-foreground">
-                Please add your <code className="bg-muted-foreground/20 px-1 py-0.5 rounded">NEXT_PUBLIC_MAPTILER_API_KEY</code> to your <code className="bg-muted-foreground/20 px-1 py-0.5 rounded">.env</code> file.
-            </p>
-        </div>
-    )
-  }
-
-  return (
-    <div className="aspect-video w-full relative rounded-lg overflow-hidden">
-      <div ref={mapContainer} className="absolute inset-0" />
-    </div>
-  );
-};
-
-export default function MapViewPage() {
-  const [feeds, setFeeds] = useState<Record<string, FeedLocation>>({});
-  const [loading, setLoading] = useState(true);
+const HeatmapComponent = ({ onDataUpdate, showMarkers = true }: { onDataUpdate?: (data: any) => void, showMarkers?: boolean }) => {
+  const [heatmapData, setHeatmapData] = useState<any[]>([]);
+  const [mapCenter, setMapCenter] = useState(defaultCenter);
+  const [maxIntensity, setMaxIntensity] = useState(1);
+  const [locations, setLocations] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState('');
-  const [isOnline, setIsOnline] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  const fetchFeeds = async () => {
-    // Keep loading state true on subsequent fetches to show loading indicator.
-    setLoading(true); 
-    setError(null);
-    
+  // FastAPI endpoint URL
+  const API_ENDPOINT = 'http://localhost:5000/api/heatmap';
+
+  // Fetch data from FastAPI
+  const fetchFromAPI = async () => {
+    setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/feeds');
-      
+      console.log("Fetching heatmap data from API:", API_ENDPOINT);
+      const response = await fetch(API_ENDPOINT);
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const apiResponse = await response.json();
+      console.log("API Response:", apiResponse);
+      
+      // Extract heatmap data from the response
+      const heatmapDataArray = apiResponse.heatmap || [];
+      console.log("Extracted heatmap data:", heatmapDataArray);
+      
+      if (heatmapDataArray.length === 0) {
+        throw new Error("No heatmap data received from API");
       }
       
-      const data: FeedsResponse = await response.json();
-      setFeeds(data.feeds);
-      setLastUpdated(data.timestamp);
-      setIsOnline(true);
+      // Store data in Firestore
+      await storeInFirestore(heatmapDataArray, apiResponse.timestamp);
       
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'API not available');
-      setIsOnline(false);
+      // Process data for heatmap
+      await processHeatmapData(heatmapDataArray);
       
+      // Notify parent component about data update
+      if (onDataUpdate) {
+        onDataUpdate({
+          locations: heatmapDataArray,
+          maxIntensity: Math.max(...heatmapDataArray.map(item => parseFloat(item.intensity || 0)), 1),
+          timestamp: apiResponse.timestamp
+        });
+      }
+      
+      setError(null);
+      console.log("Successfully processed heatmap data");
+    } catch (err: any) {
+      console.error("Error fetching from API: ", err);
+      setError(`Failed to fetch data from API: ${err.message}`);
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
+  // Store API data in Firestore
+  const storeInFirestore = async (heatmapData: any[], timestamp: string) => {
+    try {
+      const promises = heatmapData.map(async (item, index) => {
+        const docRef = doc(db, 'heatmap_data', `location_${item.area || index}`);
+        await setDoc(docRef, {
+          ...item,
+          apiTimestamp: timestamp,
+          firestoreTimestamp: serverTimestamp(),
+          lastUpdated: new Date().toISOString()
+        });
+      });
+      
+      await Promise.all(promises);
+      console.log("Heatmap data stored in Firestore successfully");
+    } catch (err) {
+      console.error("Error storing data in Firestore: ", err);
+      throw err;
+    }
+  };
+
+  // Process data for heatmap visualization
+  const processHeatmapData = async (data: any[]) => {
+    try {
+      console.log("Processing heatmap data:", data);
+      setLocations(data);
+      
+      // Find the maximum intensity to normalize weights
+      const intensities = data.map(item => parseFloat(item.intensity || 0));
+      const maxIntensityValue = Math.max(...intensities, 1);
+      setMaxIntensity(maxIntensityValue);
+      console.log("Max intensity:", maxIntensityValue);
+      
+      // Create heatmap data points
+      const heatmapPoints = data.map((item, index) => {
+        const intensity = parseFloat(item.intensity || 0);
+        const weight = maxIntensityValue > 0 ? Math.max(0.1, intensity / maxIntensityValue) : 0.1;
+        
+        console.log(`Location ${index + 1}:`, {
+          name: item.name,
+          lat: item.location.lat,
+          lng: item.location.lng,
+          intensity: intensity,
+          weight: weight
+        });
+        
+        return {
+          location: new google.maps.LatLng(
+            parseFloat(item.location.lat), 
+            parseFloat(item.location.lng)
+          ),
+          weight: weight
+        };
+      });
+      
+      setHeatmapData(heatmapPoints);
+      console.log("Created heatmap points:", heatmapPoints.length);
+      
+      // Calculate and set map center
+      if (data.length > 0) {
+        const center = calculateCenter(data);
+        setMapCenter(center);
+        console.log("Map center set to:", center);
+      }
+    } catch (err) {
+      console.error("Error processing heatmap data: ", err);
+      setError("Failed to process heatmap data");
+    }
+  };
+
+  // Load data from Firestore (fallback)
+  const loadFromFirestore = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'heatmap_data'));
+      const firestoreData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      if (firestoreData.length > 0) {
+        const hasValidStructure = firestoreData.every(item => 
+          item.location && item.location.lat && item.location.lng
+        );
+        
+        if (hasValidStructure) {
+          await processHeatmapData(firestoreData);
+          console.log("Loaded data from Firestore with valid structure");
+        } else {
+          console.log("Firestore data has invalid structure, fetching from API...");
+          await fetchFromAPI();
+        }
+      } else {
+        console.log("No data in Firestore, fetching from API...");
+        await fetchFromAPI();
+      }
+    } catch (err) {
+      console.error("Error loading from Firestore: ", err);
+      await fetchFromAPI();
+    }
+  };
+
+  // Get color for alert level
+  const getAlertColor = (alertLevel: string) => {
+    switch(alertLevel?.toLowerCase()) {
+      case 'high': case 'critical': return '#ff0000';
+      case 'warning': case 'medium': return '#ffff00';
+      case 'normal': case 'low': default: return '#00ff00';
+    }
+  };
+
+  // Load initial data - try API first, then Firestore as fallback
   useEffect(() => {
-    fetchFeeds();
-    const interval = setInterval(fetchFeeds, 15000);
-    return () => clearInterval(interval);
+    const initializeData = async () => {
+      try {
+        await fetchFromAPI();
+      } catch (err) {
+        console.log("API fetch failed, trying Firestore fallback...");
+        await loadFromFirestore();
+      }
+    };
+    
+    initializeData();
   }, []);
 
-  const handleRefresh = () => {
-    fetchFeeds();
-  };
-
-  const feedsArray = Object.values(feeds);
-
-  // Group feeds by alert level for legend
-  const feedsByAlertLevel = feedsArray.reduce((acc, feed) => {
-    const level = feed.alert_level;
-    if (!acc[level]) {
-      acc[level] = [];
+  // Expose refresh function to parent
+  useEffect(() => {
+    if (window) {
+      (window as any).refreshHeatmap = fetchFromAPI;
     }
-    acc[level].push(feed);
-    return acc;
-  }, {} as Record<string, FeedLocation[]>);
+  }, []);
 
-  const formatTimestamp = (timestamp: string) => {
-    if(!timestamp) return 'N/A';
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    return date.toLocaleTimeString();
-  };
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  if (!apiKey) {
+    return (
+      <div className="aspect-video w-full bg-muted rounded-lg flex flex-col items-center justify-center text-center p-4">
+        <div className="text-destructive mb-2">⚠️</div>
+        <p className="text-sm text-muted-foreground">Google Maps API Key is missing.</p>
+         <p className="text-xs text-muted-foreground">Please add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to your environment variables.</p>
+      </div>
+    );
+  }
+
+  if (error && locations.length === 0) {
+    return (
+      <div className="aspect-video w-full bg-muted rounded-lg flex flex-col items-center justify-center text-center p-4">
+        <div className="text-destructive mb-2">⚠️</div>
+        <p className="text-sm text-muted-foreground">{error}</p>
+        <button 
+          onClick={fetchFromAPI}
+          className="mt-2 px-3 py-1 bg-primary text-primary-foreground rounded text-sm"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      <div className="lg:col-span-2 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-sm text-muted-foreground">
-              {lastUpdated && `Last updated: ${formatTimestamp(lastUpdated)}`}
-            </div>
-            <div className="flex items-center gap-1">
-              {isOnline ? (
-                <Wifi className="h-4 w-4 text-green-500" />
-              ) : (
-                <WifiOff className="h-4 w-4 text-yellow-500" />
-              )}
-              <span className={cn("text-xs", isOnline ? "text-green-500" : "text-yellow-500")}>
-                {isOnline ? "Live" : "Offline"}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleRefresh} disabled={loading}>
-              <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
-              Refresh
-            </Button>
-            <Button variant="outline">
-              <Maximize className="mr-2 h-4 w-4" />
-              Full Screen
-            </Button>
-          </div>
+    <div className="w-full h-full relative">
+      {/* Status indicator */}
+      {loading && (
+        <div style={statusStyle}>
+          Fetching heatmap data...
         </div>
+      )}
 
-        {error && !loading && (
-          <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm font-medium">Connection Error</span>
-            </div>
-            <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-              Could not connect to the data source: {error}
-            </p>
-          </div>
-        )}
+      <LoadScript
+        googleMapsApiKey={apiKey}
+        libraries={['visualization']}
+      >
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          center={mapCenter}
+          zoom={16}
+          options={{
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            zoomControlOptions: {
+              position: google.maps.ControlPosition.RIGHT_BOTTOM
+            }
+          }}
+        >
+          {heatmapData.length > 0 && (
+            <HeatmapLayer
+              data={heatmapData}
+              options={{
+                radius: 40,
+                opacity: 0.8,
+                // Enhanced gradient: Green -> Yellow -> Red based on population intensity
+                gradient: [
+                  'rgba(0, 255, 0, 0)',      // Transparent green
+                  'rgba(0, 255, 0, 0.2)',    // Light green
+                  'rgba(0, 255, 0, 0.4)',    // Green
+                  'rgba(0, 255, 0, 0.6)',    // Green
+                  'rgba(100, 255, 0, 0.6)',  // Green-yellow
+                  'rgba(150, 255, 0, 0.7)',  // Yellow-green
+                  'rgba(200, 255, 0, 0.7)',  // Yellow-green
+                  'rgba(255, 255, 0, 0.8)',  // Yellow
+                  'rgba(255, 200, 0, 0.8)',  // Orange-yellow
+                  'rgba(255, 150, 0, 0.9)',  // Orange
+                  'rgba(255, 100, 0, 0.9)',  // Red-orange
+                  'rgba(255, 50, 0, 1)',     // Red-orange
+                  'rgba(255, 0, 0, 1)'       // Red
+                ]
+              }}
+            />
+          )}
 
-        <Card className="overflow-hidden">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Live Feed Locations</span>
-              <Badge variant="outline">
-                {feedsArray.length} Active Feeds
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading && feedsArray.length === 0 ? (
-              <div className="aspect-video w-full bg-muted rounded-lg flex items-center justify-center">
-                <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <InteractiveMap 
-                feeds={feedsArray}
-              />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Map Legend</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {Object.entries(alertLevelConfig).map(([level, config]) => {
-              const count = (feedsByAlertLevel[level as keyof typeof feedsByAlertLevel] || []).length;
-              const Icon = config.icon;
-              return (
-                <div key={level} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={cn("h-4 w-4 rounded-full", config.color)}></span>
-                    <Icon className="h-4 w-4" />
-                    <span>{config.label}</span>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    {count}
-                  </Badge>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Feed Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {loading && feedsArray.length === 0 ? (
-              <div className="text-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                <p className="text-sm text-muted-foreground mt-2">Loading feeds...</p>
-              </div>
-            ) : feedsArray.length === 0 && !loading ? (
-              <div className="text-center py-4">
-                <AlertTriangle className="h-6 w-6 text-yellow-500 mx-auto" />
-                <p className="text-sm text-muted-foreground mt-2">No feeds available</p>
-              </div>
-            ) : (
-              feedsArray.map((feed) => (
-                <div key={feed.feed_id} className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className={cn("font-medium", getStatusColor(feed.alert_level))}>
-                      {feed.name}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">{feed.density_percentage}%</span>
-                      <Badge 
-                        variant={feed.alert_level === 'critical' ? 'destructive' : 
-                                feed.alert_level === 'warning' ? 'default' : 'secondary'}
-                        className="text-xs"
-                      >
-                        {feed.current_count}
-                      </Badge>
-                    </div>
-                  </div>
-                  <Progress 
-                    value={feed.density_percentage} 
-                    className="h-2" 
-                    indicatorClassName={getProgressColor(feed.density_percentage)} 
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    {feed.area.replace('_', ' ')} • Updated {formatTimestamp(feed.last_updated)}
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          {/* Camera location markers - only show if enabled */}
+          {showMarkers && locations.map((item, index) => (
+            <Marker
+              key={index}
+              position={{ 
+                lat: parseFloat(item.location.lat), 
+                lng: parseFloat(item.location.lng) 
+              }}
+              title={`${item.name}\nArea: ${item.area}\nIntensity: ${item.intensity}\nCount: ${item.count}\nAlert Level: ${item.alert_level}`}
+              icon={{
+                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                  <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="14" cy="14" r="12" fill="${getAlertColor(item.alert_level)}" stroke="white" stroke-width="3"/>
+                    <circle cx="14" cy="14" r="7" fill="rgba(0,0,0,0.3)"/>
+                    <text x="14" y="18" text-anchor="middle" fill="white" font-size="11" font-weight="bold">${index + 1}</text>
+                  </svg>
+                `),
+                scaledSize: new google.maps.Size(28, 28)
+              }}
+            />
+          ))}
+        </GoogleMap>
+      </LoadScript>
     </div>
   );
-}
+};
+
+export default HeatmapComponent;
 
     
