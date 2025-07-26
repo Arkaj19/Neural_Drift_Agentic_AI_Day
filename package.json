@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:seed": "node src/scripts/seed-medical-staff.js"
+    "db:seed": "node src/scripts/seed-medical-staff.js",
+    "db:seed:ambulances": "node src/scripts/seed-ambulances.js"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",
