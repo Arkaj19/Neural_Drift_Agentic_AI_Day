@@ -74,10 +74,10 @@ const prompt = ai.definePrompt({
     Response: "Thank you. I have all the details. Opening the Missing Person form for you to review and submit."
     Action: PREFILL_MISSING_PERSON_FORM
   - **CONVERSATION (Ongoing):**
-    Action: null
+    Action: null. IMPORTANT: The action for this category MUST BE null.
   - **DEFAULT:**
     Response: "I can help with medical emergencies, missing person reports, and map directions. What do you need?"
-    Action: null
+    Action: null. IMPORTANT: The action for this category MUST BE null.
 
   **Current Conversation State:**
   - History: The user's conversation history is provided in the input. Use it for context.
