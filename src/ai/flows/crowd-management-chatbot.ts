@@ -86,7 +86,7 @@ const prompt = ai.definePrompt({
   - Current Missing Person Data: {{{missingPersonData}}}
   - User's Latest Message: {{{query}}}
 
-  Analyze the user's message based on the history and current data, and respond with the appropriate JSON object.
+  Analyze the user's message based on the history and current data, and respond with the appropriate JSON object. Make sure to populate \`updatedMissingPersonData\` with the information extracted from the user's query.
   `,
 });
 
