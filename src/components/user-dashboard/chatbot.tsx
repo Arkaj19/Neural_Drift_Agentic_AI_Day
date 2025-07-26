@@ -8,9 +8,8 @@ import { CardContent, CardDescription, CardHeader, CardTitle } from "@/component
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { crowdManagementChatbot, type CrowdManagementChatbotOutput, type CrowdManagementChatbotInput } from '@/ai/flows/crowd-management-chatbot';
+import { crowdManagementChatbot, type CrowdManagementChatbotOutput } from '@/ai/flows/crowd-management-chatbot';
 import { nanoid } from 'nanoid';
-import { type MissingPersonFormData } from './missing-person-form';
 
 interface ChatMessage {
     id: string;
@@ -18,18 +17,14 @@ interface ChatMessage {
     text: string;
 }
 
-type MissingPersonData = CrowdManagementChatbotInput['missingPersonData'];
-
 interface ChatbotProps {
     handleNavigation: (path: string, tab?: string) => void;
-    handlePrefillAndNavigate: (data: Partial<MissingPersonFormData>) => void;
 }
 
-export default function Chatbot({ handleNavigation, handlePrefillAndNavigate }: ChatbotProps) {
+export default function Chatbot({ handleNavigation }: ChatbotProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
-    const [missingPersonData, setMissingPersonData] = useState<MissingPersonData>({});
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -56,35 +51,22 @@ export default function Chatbot({ handleNavigation, handlePrefillAndNavigate }: 
             const result: CrowdManagementChatbotOutput = await crowdManagementChatbot({ 
                 query: input,
                 history: messages,
-                missingPersonData: missingPersonData,
             });
 
             const botMessage: ChatMessage = { id: nanoid(), role: 'bot', text: result.response };
             setMessages(prev => [...prev, botMessage]);
             
-            if (result.updatedMissingPersonData) {
-                setMissingPersonData(result.updatedMissingPersonData);
-            }
 
             if (result.action) {
                 switch (result.action) {
                     case 'NAVIGATE_TO_EMERGENCY_FORM':
                         handleNavigation('user/dashboard', 'medical');
                         break;
+                    case 'NAVIGATE_TO_MISSING_PERSON_FORM':
+                        handleNavigation('user/dashboard', 'missing');
+                        break;
                     case 'NAVIGATE_TO_MAP':
                         handleNavigation('/map-view');
-                        break;
-                    case 'PREFILL_MISSING_PERSON_FORM':
-                         if (result.updatedMissingPersonData) {
-                            handlePrefillAndNavigate({
-                                personName: result.updatedMissingPersonData.personName,
-                                lastSeenLocation: result.updatedMissingPersonData.lastSeenLocation,
-                                lastSeenTime: result.updatedMissingPersonData.lastSeenTime,
-                                details: result.updatedMissingPersonData.description,
-                            });
-                        }
-                        // Reset for next conversation
-                        setMissingPersonData({});
                         break;
                 }
             }

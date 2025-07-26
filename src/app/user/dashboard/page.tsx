@@ -29,7 +29,7 @@ import { createGrievance } from '@/services/grievance-service';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserProfile } from '@/hooks/use-user-profile';
 import MedicalAttentionForm from '@/components/user-dashboard/medical-form';
-import MissingPersonForm, { type MissingPersonFormData } from '@/components/user-dashboard/missing-person-form';
+import MissingPersonForm from '@/components/user-dashboard/missing-person-form';
 import Chatbot from '@/components/user-dashboard/chatbot';
 import { useRouter } from 'next/navigation';
 
@@ -237,7 +237,6 @@ export default function UserDashboardPage() {
   const [formResetCounter, setFormResetCounter] = useState(0);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("chatbot");
-  const [prefilledData, setPrefilledData] = useState<Partial<MissingPersonFormData> | null>(null);
 
   const resetAllForms = () => {
     setFormResetCounter(prev => prev + 1);
@@ -252,11 +251,6 @@ export default function UserDashboardPage() {
         }
     }
   };
-
-  const handlePrefillAndNavigate = useCallback((data: Partial<MissingPersonFormData>) => {
-    setPrefilledData(data);
-    setActiveTab("missing");
-  }, []);
 
   useEffect(() => {
     const loggedInUserEmail = localStorage.getItem('userEmail');
@@ -386,13 +380,11 @@ export default function UserDashboardPage() {
                             loading={formLoading}
                             handleSubmit={(type: any, details: any, user: any) => handleGrievanceSubmit(type, details, user, setFormLoading, toast, resetAllForms)}
                             resetCounter={formResetCounter}
-                            prefilledData={prefilledData}
                         />
                     </TabsContent>
                     <TabsContent value="chatbot">
                          <Chatbot 
                             handleNavigation={handleNavigation} 
-                            handlePrefillAndNavigate={handlePrefillAndNavigate}
                          />
                     </TabsContent>
                 </Tabs>

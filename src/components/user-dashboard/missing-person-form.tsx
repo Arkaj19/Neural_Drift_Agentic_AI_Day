@@ -15,7 +15,6 @@ import { ImageIcon, X } from 'lucide-react';
 export interface MissingPersonFormData {
     personName: string;
     lastSeenLocation: string;
-    lastSeenTime?: string; // from chatbot
     lastSeenHour: string;
     lastSeenMinute: string;
     details: string;
@@ -28,10 +27,9 @@ interface MissingPersonFormProps {
     loading: boolean;
     handleSubmit: Function;
     resetCounter: number;
-    prefilledData?: Partial<MissingPersonFormData> | null;
 }
 
-export default function MissingPersonForm({ user, locations, loading, handleSubmit, resetCounter, prefilledData }: MissingPersonFormProps) {
+export default function MissingPersonForm({ user, locations, loading, handleSubmit, resetCounter }: MissingPersonFormProps) {
     const [personName, setPersonName] = useState('');
     const [lastSeenLocation, setLastSeenLocation] = useState('');
     const [lastSeenHour, setLastSeenHour] = useState('');
@@ -58,33 +56,6 @@ export default function MissingPersonForm({ user, locations, loading, handleSubm
         onReset();
     }, [resetCounter]);
     
-    useEffect(() => {
-        if (prefilledData) {
-            setPersonName(prefilledData.personName || '');
-            setLastSeenLocation(prefilledData.lastSeenLocation || '');
-            setDetails(prefilledData.details || '');
-            
-            if (prefilledData.lastSeenTime) {
-                // Basic time parsing from chatbot response (e.g., "5pm", "around 3:30")
-                const timeMatch = prefilledData.lastSeenTime.match(/(\d{1,2})[:\s]?(\d{2})?\s?(am|pm)?/i);
-                if (timeMatch) {
-                    let hour = parseInt(timeMatch[1], 10);
-                    const minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-                    const period = timeMatch[3]?.toLowerCase();
-
-                    if (period === 'pm' && hour < 12) {
-                        hour += 12;
-                    } else if (period === 'am' && hour === 12) {
-                        hour = 0;
-                    }
-                    
-                    setLastSeenHour(hour.toString().padStart(2, '0'));
-                    setLastSeenMinute(minute.toString().padStart(2, '0'));
-                }
-            }
-        }
-    }, [prefilledData]);
-
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -101,7 +72,7 @@ export default function MissingPersonForm({ user, locations, loading, handleSubm
         <div>
             <CardHeader className="px-1 pt-4">
                 <CardTitle>Missing Person</CardTitle>
-                <CardDescription>Report a missing person. Please review the pre-filled details.</CardDescription>
+                <CardDescription>Report a missing person. Please provide as much detail as possible.</CardDescription>
             </CardHeader>
             <CardContent className="px-1">
                  <form onSubmit={(e) => {
