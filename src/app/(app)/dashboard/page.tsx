@@ -36,7 +36,7 @@ import {
   AlertOctagon,
 } from "lucide-react";
 import { collection, onSnapshot, doc, addDoc, updateDoc, query, where } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -178,6 +178,8 @@ export default function DashboardPage() {
     general: 0,
   });
 
+  const alertsIntervalRef = useRef<NodeJS.Timeout>();
+
 
   useEffect(() => {
     // Fetch guards data
@@ -262,11 +264,20 @@ export default function DashboardPage() {
         }
       } catch (error) {
         console.error("Failed to fetch active alerts:", error);
+        // If the fetch fails, stop the polling to prevent console errors.
+        if (alertsIntervalRef.current) {
+          clearInterval(alertsIntervalRef.current);
+        }
+        toast({
+            title: "Could not fetch alerts",
+            description: "The connection to the alerts service failed. Please ensure the backend is running.",
+            variant: "destructive"
+        })
       }
     };
     
     fetchAlerts();
-    const alertsInterval = setInterval(fetchAlerts, 10000); // Poll every 10 seconds
+    alertsIntervalRef.current = setInterval(fetchAlerts, 10000); // Poll every 10 seconds
 
      // Fetch open grievances data
     const grievancesQuery = query(collection(db, "grievances"), where("status", "==", "new"));
@@ -285,10 +296,12 @@ export default function DashboardPage() {
     return () => {
       guardsUnsubscribe();
       crowdUnsubscribe();
-      clearInterval(alertsInterval);
+      if(alertsIntervalRef.current) {
+        clearInterval(alertsIntervalRef.current);
+      }
       grievancesUnsubscribe();
     };
-  }, []);
+  }, [toast]);
 
   const handleGuardUpdate = async (guardId: string, field: keyof Guard, value: string) => {
     const guardRef = doc(db, "guards", guardId);
