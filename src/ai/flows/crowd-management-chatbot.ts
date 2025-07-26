@@ -26,7 +26,7 @@ export type CrowdManagementChatbotInput = z.infer<typeof CrowdManagementChatbotI
 const CrowdManagementChatbotOutputSchema = z.object({
   category: z.enum(['MEDICAL_EMERGENCY', 'MISSING_PERSON', 'MAP_DIRECTIONS', 'DEFAULT']).describe('The category of the user query.'),
   response: z.string().describe('The chatbot response to the user.'),
-  action: z.enum(['NAVIGATE_TO_EMERGENCY_FORM', 'NAVIGATE_TO_MISSING_PERSON_FORM', 'NAVIGATE_TO_MAP']).nullable().describe('The navigation or prefill action to be taken by the frontend.'),
+  action: z.enum(['NAVIGATE_TO_EMERGENCY_FORM', 'NAVIGATE_TO_MISSING_PERSON_FORM', 'SHOW_USER_MAP']).nullable().describe('The navigation or prefill action to be taken by the frontend.'),
 });
 export type CrowdManagementChatbotOutput = z.infer<typeof CrowdManagementChatbotOutputSchema>;
 
@@ -56,7 +56,7 @@ const prompt = ai.definePrompt({
   - **MAP_DIRECTIONS:**
     Keywords: where, exit, washroom, toilet, food, parking, directions, map, location, gate
     Response: "🗺️ DIRECTIONS: Opening venue map to show locations of exits, washrooms, food courts, and parking areas."
-    Action: NAVIGATE_TO_MAP
+    Action: SHOW_USER_MAP
   - **DEFAULT (No Match):**
     Response: "I help with:\n🚨 Medical emergencies\n👥 Missing persons\n🗺️ Map & directions\nWhat do you need?"
     Action: null
@@ -65,7 +65,7 @@ const prompt = ai.definePrompt({
   - History: The user's conversation history is provided in the input. Use it for context.
   - User's Latest Message: {{{query}}}
 
-  Analyze the user's message based on the history and current data, and respond with the appropriate JSON object.
+  Analyze the user's message based on the history and current data, and respond with the appropriate JSON object. For DEFAULT category, action must be null.
   `,
 });
 

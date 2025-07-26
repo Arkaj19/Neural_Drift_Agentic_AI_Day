@@ -18,7 +18,7 @@ interface ChatMessage {
 }
 
 interface ChatbotProps {
-    handleNavigation: (path: string, tab?: string) => void;
+    handleNavigation: (action: string, tab?: string) => void;
 }
 
 export default function Chatbot({ handleNavigation }: ChatbotProps) {
@@ -65,8 +65,8 @@ export default function Chatbot({ handleNavigation }: ChatbotProps) {
                     case 'NAVIGATE_TO_MISSING_PERSON_FORM':
                         handleNavigation('user/dashboard', 'missing');
                         break;
-                    case 'NAVIGATE_TO_MAP':
-                        handleNavigation('/map-view');
+                    case 'SHOW_USER_MAP':
+                        handleNavigation('SHOW_USER_MAP');
                         break;
                 }
             }

@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { AlertTriangle, Bell, BellRing, X, Stethoscope, Search, Bot } from "lucide-react";
+import { AlertTriangle, Bell, BellRing, X, Stethoscope, Search, Bot, MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
@@ -32,6 +32,7 @@ import MedicalAttentionForm from '@/components/user-dashboard/medical-form';
 import MissingPersonForm from '@/components/user-dashboard/missing-person-form';
 import Chatbot from '@/components/user-dashboard/chatbot';
 import { useRouter } from 'next/navigation';
+import MapViewPage from '@/app/(app)/map-view/page';
 
 export interface Location {
     name: string;
@@ -237,14 +238,17 @@ export default function UserDashboardPage() {
   const [formResetCounter, setFormResetCounter] = useState(0);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("chatbot");
+  const [showMapView, setShowMapView] = useState(false);
 
   const resetAllForms = () => {
     setFormResetCounter(prev => prev + 1);
   };
 
-  const handleNavigation = (path: string, tab?: string) => {
-    if (path.startsWith('/')) {
-        router.push(path);
+  const handleNavigation = (action: string, tab?: string) => {
+    if (action === 'SHOW_USER_MAP') {
+        setShowMapView(true);
+    } else if (action.startsWith('/')) {
+        router.push(action);
     } else {
         if (tab) {
             setActiveTab(tab);
@@ -337,6 +341,22 @@ export default function UserDashboardPage() {
             </CardContent>
         </Card>
     );
+  }
+
+  if (showMapView) {
+      return (
+          <Card className="rounded-3xl shadow-lg">
+              <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="flex items-center gap-2"><MapIcon /> Venue Map</CardTitle>
+                    <Button variant="outline" onClick={() => setShowMapView(false)}>Close Map</Button>
+                  </div>
+              </CardHeader>
+              <CardContent>
+                  <MapViewPage />
+              </CardContent>
+          </Card>
+      )
   }
 
   return (
