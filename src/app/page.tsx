@@ -14,13 +14,13 @@ export default function LandingPage() {
       <div className="w-full max-w-md">
         <Card className="shadow-2xl">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary">
-              <Icons.shield className="h-8 w-8 text-primary-foreground" />
+            <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full">
+              <Icons.shield className="h-20 w-20" />
             </div>
-            <CardTitle className="text-3xl font-bold">Drishti AI</CardTitle>
-            <CardDescription>Event Guardian</CardDescription>
+            <CardTitle className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-400 text-transparent bg-clip-text">Drishti AI</CardTitle>
+            <CardDescription className="text-lg">Event Guardian</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-4">
             <Button
               onClick={() => router.push('/login')}
               className="w-full text-lg font-semibold"
