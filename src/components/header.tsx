@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { LogOut } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { ThemeToggle } from "./theme-toggle";
 
 export default function Header() {
   return (
@@ -22,6 +23,7 @@ export default function Header() {
             <span className="text-sm text-muted-foreground hidden md:block">System Online</span>
           </div>
           <Clock />
+          <ThemeToggle />
            <Button variant="outline" size="sm" asChild>
             <Link href="/">
               <LogOut className="mr-2 h-4 w-4" />
