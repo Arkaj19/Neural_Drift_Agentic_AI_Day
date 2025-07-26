@@ -1,6 +1,8 @@
+
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import * as maptilersdk from '@maptiler/sdk';
+import '@maptiler/sdk/dist/maptiler-sdk.css';
 import { collection, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -63,7 +65,7 @@ const MapViewPage: React.FC = () => {
   const [locations, setLocations] = useState<HeatmapDataItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [apiKey] = useState(process.env.NEXT_PUBLIC_MAPTILER_API_KEY);
+  const apiKey = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
 
   const API_ENDPOINT = 'http://localhost:5000/api/heatmap';
 
@@ -119,17 +121,9 @@ const MapViewPage: React.FC = () => {
   const processMapData = async (data: HeatmapDataItem[]): Promise<void> => {
     setLocations(data);
     if (map.current && data.length > 0) {
-      // Clear existing markers
-      map.current.getStyle().layers.forEach(layer => {
-        if (layer.id.startsWith('marker-')) {
-          map.current?.removeLayer(layer.id);
-        }
-      });
-      map.current.getStyle().sources.forEach(source => {
-        if (source.type === 'geojson' && source.id?.startsWith('marker-')) {
-          map.current?.removeSource(source.id);
-        }
-      })
+      // Clear existing markers by removing their DOM elements
+      const existingMarkers = document.querySelectorAll('.custom-marker');
+      existingMarkers.forEach(marker => marker.remove());
 
       // Add new markers
       data.forEach((item, index) => {
@@ -176,8 +170,8 @@ const MapViewPage: React.FC = () => {
   };
   
   useEffect(() => {
-    if (!apiKey) {
-      setError("MapTiler API key is missing. Please add NEXT_PUBLIC_MAPTILER_API_KEY to your environment variables.");
+    if (!apiKey || apiKey === 'YOUR_MAPTILER_API_KEY_HERE') {
+      setError("MapTiler API key is missing or is a placeholder. Please add NEXT_PUBLIC_MAPTILER_API_KEY to your .env file.");
       return;
     }
     if (map.current || !mapContainer.current) return;
@@ -194,11 +188,15 @@ const MapViewPage: React.FC = () => {
     map.current.on('load', () => {
         fetchFromAPI();
         const interval = setInterval(fetchFromAPI, 15000); // Refresh every 15 seconds
+        
+        // Return cleanup function for interval
         return () => clearInterval(interval);
     });
 
+    // Return cleanup function for map instance
     return () => {
         map.current?.remove();
+        map.current = null;
     }
   }, [apiKey]);
   
@@ -207,8 +205,8 @@ const MapViewPage: React.FC = () => {
       <div className="aspect-video w-full bg-muted rounded-lg flex flex-col items-center justify-center text-center p-4">
         <div className="text-destructive mb-2">⚠️</div>
         <p className="text-sm text-muted-foreground">{error}</p>
-        <Button onClick={fetchFromAPI} className="mt-2" variant="outline">
-          Retry
+        <Button onClick={fetchFromAPI} className="mt-2" variant="outline" disabled={loading}>
+          {loading ? 'Retrying...' : 'Retry'}
         </Button>
       </div>
     );
