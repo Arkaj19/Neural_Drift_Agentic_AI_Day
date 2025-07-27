@@ -7,14 +7,58 @@ import { LogOut } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { ThemeToggle } from "./theme-toggle";
-import { useUserProfile } from "@/hooks/use-user-profile";
+import { UserProfile, useUserProfile } from "@/hooks/use-user-profile";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Skeleton } from "./ui/skeleton";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
 
 function UserProfileDisplay() {
-    const { user, loading } = useUserProfile();
+    const { user: regularUser, loading: userLoading } = useUserProfile();
+    const [adminUser, setAdminUser] = useState<UserProfile | null>(null);
+    const [loading, setLoading] = useState(true);
     const router = useRouter();
+
+    useEffect(() => {
+        const fetchAdminUser = async () => {
+            if (userLoading) return;
+            // If it's a regular user, no need to check for admin
+            if (regularUser) {
+                setLoading(false);
+                return;
+            }
+
+            const loggedInUserEmail = localStorage.getItem('userEmail');
+            if (!loggedInUserEmail) {
+                setLoading(false);
+                return;
+            }
+            
+            try {
+                const q = query(collection(db, "admin"), where("email", "==", loggedInUserEmail));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    const adminDoc = querySnapshot.docs[0].data();
+                    setAdminUser({
+                        id: querySnapshot.docs[0].id,
+                        fullName: adminDoc.username, // Admins have username
+                        email: adminDoc.email,
+                        phone: '' // Admin may not have phone
+                    });
+                }
+            } catch (error) {
+                console.error("Error fetching admin profile:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAdminUser();
+    }, [regularUser, userLoading]);
 
     const handleLogout = () => {
         localStorage.removeItem('userEmail');
@@ -27,6 +71,8 @@ function UserProfileDisplay() {
             <Skeleton className="h-10 w-10 rounded-full" />
         </div>
     }
+    
+    const user = regularUser || adminUser;
 
     if (!user) {
         return <Button variant="outline" size="sm" asChild>
@@ -38,7 +84,7 @@ function UserProfileDisplay() {
     }
 
     const getInitials = (name: string) => {
-        if (!name) return 'U';
+        if (!name) return 'A';
         return name.split(' ').map(n => n[0]).join('').toUpperCase();
     }
 
