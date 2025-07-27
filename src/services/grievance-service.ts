@@ -11,51 +11,31 @@ interface GrievanceData {
     location?: string;
     personName?: string;
     lastSeen?: string;
-    photoFile?: File;
+    photoDataUri?: string;
 }
 
 // This is the type that will be stored in Firestore.
-// Notice it does not contain `photoFile`.
-interface GrievancePayload {
-    type: 'Medical Attention' | 'Missing Person' | 'General Grievance';
-    details: string;
-    submittedBy: string;
-    email: string;
+interface GrievancePayload extends GrievanceData {
     status: 'new' | 'resolved';
     submittedAt: any;
-    location?: string;
-    personName?: string;
-    lastSeen?: string;
-    photoDataUri?: string;
 }
 
 
 export const createGrievance = async (data: GrievanceData) => {
     // Manually construct the payload to ensure no File object is included.
-    const grievancePayload: GrievancePayload = {
+    const grievancePayload: Partial<GrievancePayload> = {
         type: data.type,
         details: data.details,
         submittedBy: data.submittedBy,
         email: data.email,
-        location: data.location,
-        personName: data.personName,
-        lastSeen: data.lastSeen,
         status: 'new',
         submittedAt: serverTimestamp(),
     };
     
-    if (data.photoFile) {
-        try {
-            // Convert file to buffer and then to data URL on the server
-            const fileBuffer = await data.photoFile.arrayBuffer();
-            const base64 = Buffer.from(fileBuffer).toString('base64');
-            // Add the data URI to the payload
-            grievancePayload.photoDataUri = `data:${data.photoFile.type};base64,${base64}`;
-        } catch (error) {
-            console.error("Error processing photo:", error);
-            throw new Error("Failed to process photo.");
-        }
-    }
+    if (data.location) grievancePayload.location = data.location;
+    if (data.personName) grievancePayload.personName = data.personName;
+    if (data.lastSeen) grievancePayload.lastSeen = data.lastSeen;
+    if (data.photoDataUri) grievancePayload.photoDataUri = data.photoDataUri;
 
     try {
         const docRef = await addDoc(collection(db, 'grievances'), grievancePayload);

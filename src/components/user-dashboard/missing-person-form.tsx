@@ -18,7 +18,7 @@ export interface MissingPersonFormData {
     lastSeenHour: string;
     lastSeenMinute: string;
     details: string;
-    photo: File | null;
+    photoDataUri: string | null;
 }
 
 interface MissingPersonFormProps {
@@ -35,8 +35,7 @@ export default function MissingPersonForm({ user, locations, loading, handleSubm
     const [lastSeenHour, setLastSeenHour] = useState('');
     const [lastSeenMinute, setLastSeenMinute] = useState('');
     const [details, setDetails] = useState('');
-    const [photo, setPhoto] = useState<File | null>(null);
-    const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+    const [photoDataUri, setPhotoDataUri] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
@@ -48,8 +47,10 @@ export default function MissingPersonForm({ user, locations, loading, handleSubm
         setLastSeenHour('');
         setLastSeenMinute('');
         setDetails('');
-        setPhoto(null);
-        setPhotoPreview(null);
+        setPhotoDataUri(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
     };
 
     useEffect(() => {
@@ -59,10 +60,9 @@ export default function MissingPersonForm({ user, locations, loading, handleSubm
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            setPhoto(file);
             const reader = new FileReader();
             reader.onloadend = () => {
-                setPhotoPreview(reader.result as string);
+                setPhotoDataUri(reader.result as string);
             };
             reader.readAsDataURL(file);
         }
@@ -83,7 +83,7 @@ export default function MissingPersonForm({ user, locations, loading, handleSubm
                         lastSeenHour,
                         lastSeenMinute,
                         details,
-                        photo
+                        photoDataUri
                     }, user);
                 }} className="space-y-4">
                     <div className="space-y-2">
@@ -128,17 +128,17 @@ export default function MissingPersonForm({ user, locations, loading, handleSubm
                     </div>
                      <div className="space-y-2">
                         <Label>Photo (Optional)</Label>
-                        {photoPreview && (
+                        {photoDataUri && (
                             <div className="relative w-24 h-24">
-                                <Image src={photoPreview} alt="Preview" layout="fill" objectFit="cover" className="rounded-md" />
-                                <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => { setPhoto(null); setPhotoPreview(null); }}>
+                                <Image src={photoDataUri} alt="Preview" layout="fill" objectFit="cover" className="rounded-md" />
+                                <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => { setPhotoDataUri(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>
                                     <X className="h-4 w-4" />
                                 </Button>
                             </div>
                         )}
                         <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                             <ImageIcon className="mr-2 h-4 w-4" />
-                            {photo ? "Change Photo" : "Upload Photo"}
+                            {photoDataUri ? "Change Photo" : "Upload Photo"}
                         </Button>
                         <Input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoChange} />
                     </div>

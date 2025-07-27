@@ -209,9 +209,11 @@ const handleGrievanceSubmit = async (
             type,
             submittedBy: user.email,
             email: user.email,
-            ...details,
+            details: details.details,
+            location: details.location,
+            personName: details.personName,
+            photoDataUri: details.photoDataUri,
             lastSeen,
-            photoFile: details.photo,
         });
 
         toast({
