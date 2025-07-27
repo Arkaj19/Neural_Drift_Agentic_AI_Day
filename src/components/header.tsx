@@ -6,15 +6,14 @@ import Clock from "./clock";
 import { Button } from "./ui/button";
 import { LogOut } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { ThemeToggle } from "./theme-toggle";
-import { UserProfile, useUserProfile } from "@/hooks/use-user-profile";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Skeleton } from "./ui/skeleton";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useUserProfile, type UserProfile } from "@/hooks/use-user-profile";
 
 
 function UserProfileDisplay() {
@@ -24,54 +23,53 @@ function UserProfileDisplay() {
     const router = useRouter();
 
     useEffect(() => {
-        const fetchUser = async () => {
-            const loggedInUserEmail = localStorage.getItem('userEmail');
-            if (!loggedInUserEmail) {
-                setLoading(false);
-                return;
-            }
-
+        const fetchAdminProfile = async (email: string) => {
             try {
-                // Check for admin user
-                const adminQuery = query(collection(db, "admin"), where("email", "==", loggedInUserEmail));
+                const adminQuery = query(collection(db, "admin"), where("email", "==", email));
                 const adminSnapshot = await getDocs(adminQuery);
-
                 if (!adminSnapshot.empty) {
-                    const adminDoc = adminSnapshot.docs[0].data();
+                    const adminDoc = adminSnapshot.docs[0];
+                    const adminData = adminDoc.data();
                     setAdminUser({
-                        id: adminSnapshot.docs[0].id,
-                        fullName: adminDoc.username, // Admins have username
-                        email: adminDoc.email,
-                        phone: '' // Admin may not have phone
+                        id: adminDoc.id,
+                        fullName: adminData.username, // Admins use 'username' for their name
+                        email: adminData.email,
+                        phone: adminData.phone || '' 
                     });
                 }
             } catch (error) {
                 console.error("Error fetching admin profile:", error);
-            } finally {
-                 // The regular user profile is handled by the useUserProfile hook,
-                 // so we just need to wait for its loading state to finish.
-                setLoading(userLoading);
             }
         };
 
-        fetchUser();
+        const loggedInUserEmail = localStorage.getItem('userEmail');
+        if (loggedInUserEmail) {
+            // The regular user profile is fetched by the hook, so we only need to fetch admin here
+            fetchAdminProfile(loggedInUserEmail);
+        }
+
+    }, []);
+
+    // The component is loading if the user profile hook is still loading
+    useEffect(() => {
+        setLoading(userLoading);
     }, [userLoading]);
+
 
     const handleLogout = () => {
         localStorage.removeItem('userEmail');
         router.push('/');
     }
     
-    // Combine loading states
-    const isLoading = loading || userLoading;
-    if (isLoading) {
+    // The final user object is either the regular user or the admin user
+    const user = regularUser || adminUser;
+
+    if (loading) {
         return <div className="flex items-center gap-2">
             <Skeleton className="h-8 w-40" />
             <Skeleton className="h-10 w-10 rounded-full" />
         </div>
     }
-    
-    const user = regularUser || adminUser;
 
     if (!user) {
         return <Button variant="outline" size="sm" asChild>
@@ -94,7 +92,7 @@ function UserProfileDisplay() {
                 <div className="text-xs text-muted-foreground">{user.email}</div>
             </div>
             <Avatar>
-                <AvatarFallback className="bg-orange-500 text-white">
+                <AvatarFallback className="bg-primary text-primary-foreground">
                     {getInitials(user.fullName)}
                 </AvatarFallback>
             </Avatar>
@@ -103,8 +101,8 @@ function UserProfileDisplay() {
             </Button>
         </div>
     )
-
 }
+
 
 export default function Header() {
   return (
