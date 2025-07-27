@@ -47,6 +47,13 @@ const SummarizeDashboardInputSchema = z.object({
 });
 export type SummarizeDashboardInput = z.infer<typeof SummarizeDashboardInputSchema>;
 
+// Internal schema for the prompt, including calculated values
+const SummarizeDashboardPromptInputSchema = SummarizeDashboardInputSchema.extend({
+    activeGuards: z.number(),
+    standbyGuards: z.number(),
+    alertGuards: z.number(),
+});
+
 const SummarizeDashboardOutputSchema = z.object({
   summary: z.string().describe("A concise, human-readable summary of the current event status."),
 });
@@ -58,7 +65,7 @@ export async function summarizeDashboard(input: SummarizeDashboardInput): Promis
 
 const prompt = ai.definePrompt({
   name: 'summarizeDashboardPrompt',
-  input: { schema: SummarizeDashboardInputSchema },
+  input: { schema: SummarizeDashboardPromptInputSchema },
   output: { schema: SummarizeDashboardOutputSchema },
   prompt: `You are an AI event command center analyst. Your task is to provide a concise, high-level summary of the current event status based on the data provided.
 
@@ -87,9 +94,9 @@ Focus on the most critical information first. Structure your summary into three 
 **Guard Status:**
 {{#if guards.length}}
 - {{guards.length}} guards are on duty.
-- Active guards: {{guards.filter(g => g.status === 'Active').length}}
-- Guards on standby: {{guards.filter(g => g.status === 'Standby').length}}
-- Guards in alert status: {{guards.filter(g => g.status === 'Alert').length}}
+- Active guards: {{activeGuards}}
+- Guards on standby: {{standbyGuards}}
+- Guards in alert status: {{alertGuards}}
 {{else}}
 - No guard data available.
 {{/if}}
@@ -107,7 +114,19 @@ const summarizeDashboardFlow = ai.defineFlow(
     outputSchema: SummarizeDashboardOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
+    // Pre-process the data to calculate guard counts
+    const activeGuards = input.guards.filter(g => g.status === 'Active').length;
+    const standbyGuards = input.guards.filter(g => g.status === 'Standby').length;
+    const alertGuards = input.guards.filter(g => g.status === 'Alert').length;
+
+    // Call the prompt with the original input and the new calculated values
+    const { output } = await prompt({
+      ...input,
+      activeGuards,
+      standbyGuards,
+      alertGuards,
+    });
+    
     return output!;
   }
 );
