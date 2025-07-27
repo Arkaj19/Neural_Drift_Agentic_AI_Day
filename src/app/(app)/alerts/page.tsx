@@ -138,7 +138,9 @@ export default function AlertsPage() {
       }
       const predictionsData: PredictionsResponse = await predictionsResponse.json();
       
-      const predictedAlerts: PredictedAlert[] = predictionsData.predictions
+      const predictions = Array.isArray(predictionsData.predictions) ? predictionsData.predictions : [];
+
+      const predictedAlerts: PredictedAlert[] = predictions
         .filter(p => p.riskLevel === 'high')
         .map(p => ({
             feed_id: `pred_${p.sectorId.replace(' ', '_')}`,
