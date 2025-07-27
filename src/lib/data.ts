@@ -1,6 +1,5 @@
 
 export const keyMetrics = {
-    "Total Crowd": { value: '0', change: '+0', changeType: 'neutral' as const }, // This will be updated from Firestore
     "Active Guards": { value: '0', change: '+0', changeType: 'neutral' as const }, // This will be updated from Firestore
     "Active Alerts": { value: '0', change: '+0', changeType: 'neutral' as const },
 };

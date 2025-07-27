@@ -63,7 +63,6 @@ import { summarizeDashboard } from "@/ai/flows/summarize-dashboard";
 
 
 const metricIcons: { [key: string]: React.ElementType } = {
-    "Total Crowd": Users,
     "Active Guards": ShieldAlert,
     "Active Alerts": Signal,
     "Open Grievances": AlertOctagon,
@@ -217,32 +216,6 @@ export default function DashboardPage() {
       });
     });
 
-    // Fetch total crowd data
-    const crowdDocRef = doc(db, "crowdData", "total");
-    const crowdUnsubscribe = onSnapshot(crowdDocRef, (doc) => {
-        if (doc.exists()) {
-            const crowdData = doc.data();
-            setMetrics(prevMetrics => {
-              const totalCrowdMetric = prevMetrics["Total Crowd"];
-              if(!totalCrowdMetric) return prevMetrics;
-
-              const currentCrowd = parseInt(totalCrowdMetric.value.replace(/,/g, '')) || 0;
-              const newCrowd = crowdData.count;
-              const changeType = newCrowd > currentCrowd ? 'increase' : newCrowd < currentCrowd ? 'decrease' : 'neutral';
-
-              return {
-                  ...prevMetrics,
-                  "Total Crowd": {
-                      ...totalCrowdMetric,
-                      value: newCrowd.toLocaleString(),
-                      change: `${newCrowd - currentCrowd >= 0 ? '+' : ''}${(newCrowd - currentCrowd).toLocaleString()}`,
-                      changeType: changeType
-                  }
-              }
-            });
-        }
-    });
-
     // Fetch active alerts data
     const fetchAlerts = async () => {
       try {
@@ -306,7 +279,6 @@ export default function DashboardPage() {
 
     return () => {
       guardsUnsubscribe();
-      crowdUnsubscribe();
       if(alertsIntervalRef.current) {
         clearInterval(alertsIntervalRef.current);
       }
@@ -365,7 +337,7 @@ export default function DashboardPage() {
           Generate Summary
         </Button>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {Object.entries(metrics).map(([title, data]) => {
           const Icon = metricIcons[title];
           if (!Icon) return null;
