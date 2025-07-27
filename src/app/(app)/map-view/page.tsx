@@ -123,7 +123,8 @@ const MapViewPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const apiKey = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
 
-  const API_ENDPOINT = 'http://localhost:5000/api/heatmap';
+  // const API_ENDPOINT = 'http://localhost:5000/api/heatmap';
+  const API_ENDPOINT = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/heatmap`;
 
   const getAlertColor = (alertLevel: string): string => {
     switch (alertLevel?.toLowerCase()) {
