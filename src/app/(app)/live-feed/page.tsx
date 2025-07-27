@@ -25,7 +25,7 @@ import {
 import { useEffect, useState, useRef, useCallback } from "react";
 
 // Backend configuration
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const BACKEND_URL = 'http://localhost:5000';
 const FEED_IDS = ["feed_1", "feed_2", "feed_3", "feed_4", "feed_5"];
 
 interface FeedData {
