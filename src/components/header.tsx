@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Icons } from "./icons";
@@ -23,28 +24,22 @@ function UserProfileDisplay() {
     const router = useRouter();
 
     useEffect(() => {
-        const fetchAdminUser = async () => {
-            if (userLoading) return;
-            // If it's a regular user, no need to check for admin
-            if (regularUser) {
-                setLoading(false);
-                return;
-            }
-
+        const fetchUser = async () => {
             const loggedInUserEmail = localStorage.getItem('userEmail');
             if (!loggedInUserEmail) {
                 setLoading(false);
                 return;
             }
-            
-            try {
-                const q = query(collection(db, "admin"), where("email", "==", loggedInUserEmail));
-                const querySnapshot = await getDocs(q);
 
-                if (!querySnapshot.empty) {
-                    const adminDoc = querySnapshot.docs[0].data();
+            try {
+                // Check for admin user
+                const adminQuery = query(collection(db, "admin"), where("email", "==", loggedInUserEmail));
+                const adminSnapshot = await getDocs(adminQuery);
+
+                if (!adminSnapshot.empty) {
+                    const adminDoc = adminSnapshot.docs[0].data();
                     setAdminUser({
-                        id: querySnapshot.docs[0].id,
+                        id: adminSnapshot.docs[0].id,
                         fullName: adminDoc.username, // Admins have username
                         email: adminDoc.email,
                         phone: '' // Admin may not have phone
@@ -53,19 +48,23 @@ function UserProfileDisplay() {
             } catch (error) {
                 console.error("Error fetching admin profile:", error);
             } finally {
-                setLoading(false);
+                 // The regular user profile is handled by the useUserProfile hook,
+                 // so we just need to wait for its loading state to finish.
+                setLoading(userLoading);
             }
         };
 
-        fetchAdminUser();
-    }, [regularUser, userLoading]);
+        fetchUser();
+    }, [userLoading]);
 
     const handleLogout = () => {
         localStorage.removeItem('userEmail');
         router.push('/');
     }
-
-    if (loading) {
+    
+    // Combine loading states
+    const isLoading = loading || userLoading;
+    if (isLoading) {
         return <div className="flex items-center gap-2">
             <Skeleton className="h-8 w-40" />
             <Skeleton className="h-10 w-10 rounded-full" />
