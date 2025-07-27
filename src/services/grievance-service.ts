@@ -21,12 +21,12 @@ interface GrievancePayload {
     details: string;
     submittedBy: string;
     email: string;
+    status: 'new' | 'resolved';
+    submittedAt: any;
     location?: string;
     personName?: string;
     lastSeen?: string;
-    photoDataUri?: string | null;
-    status?: string;
-    submittedAt?: any;
+    photoDataUri?: string;
 }
 
 
@@ -40,6 +40,8 @@ export const createGrievance = async (data: GrievanceData) => {
         location: data.location,
         personName: data.personName,
         lastSeen: data.lastSeen,
+        status: 'new',
+        submittedAt: serverTimestamp(),
     };
     
     if (data.photoFile) {
@@ -54,10 +56,6 @@ export const createGrievance = async (data: GrievanceData) => {
             throw new Error("Failed to process photo.");
         }
     }
-    
-    // Add Firestore-specific fields
-    grievancePayload.status = 'new';
-    grievancePayload.submittedAt = serverTimestamp();
 
     try {
         const docRef = await addDoc(collection(db, 'grievances'), grievancePayload);
