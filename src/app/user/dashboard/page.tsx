@@ -296,7 +296,7 @@ export default function UserDashboardPage() {
 
     const fetchLocations = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/feeds');
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/video/${feedId}`);
             if (!response.ok) {
                 throw new Error(`API responded with status ${response.status}`);
             }
