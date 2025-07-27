@@ -1,69 +1,77 @@
-
 'use client';
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 import { Icons } from "./icons";
 import Clock from "./clock";
 import { Button } from "./ui/button";
 import { LogOut } from "lucide-react";
-import Link from "next/link";
 import { ThemeToggle } from "./theme-toggle";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Skeleton } from "./ui/skeleton";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useUserProfile, type UserProfile } from "@/hooks/use-user-profile";
+import type { UserProfile } from "@/hooks/use-user-profile";
 
 
 function UserProfileDisplay() {
-    const { user: regularUser, loading: userLoading } = useUserProfile();
-    const [adminUser, setAdminUser] = useState<UserProfile | null>(null);
+    const [user, setUser] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
-        const fetchAdminProfile = async (email: string) => {
+        const fetchUser = async () => {
+            setLoading(true);
+            const loggedInUserEmail = localStorage.getItem('userEmail');
+
+            if (!loggedInUserEmail) {
+                setLoading(false);
+                return;
+            }
+
             try {
-                const adminQuery = query(collection(db, "admin"), where("email", "==", email));
-                const adminSnapshot = await getDocs(adminQuery);
-                if (!adminSnapshot.empty) {
-                    const adminDoc = adminSnapshot.docs[0];
-                    const adminData = adminDoc.data();
-                    setAdminUser({
-                        id: adminDoc.id,
-                        fullName: adminData.username, // Admins use 'username' for their name
-                        email: adminData.email,
-                        phone: adminData.phone || '' 
-                    });
+                // Try fetching from 'admin' collection first
+                let userQuery = query(collection(db, "admin"), where("email", "==", loggedInUserEmail));
+                let userSnapshot = await getDocs(userQuery);
+                
+                if (userSnapshot.empty) {
+                    // If not found in admin, try 'users' collection
+                    userQuery = query(collection(db, "users"), where("email", "==", loggedInUserEmail));
+                    userSnapshot = await getDocs(userQuery);
                 }
+
+                if (!userSnapshot.empty) {
+                    const userDoc = userSnapshot.docs[0];
+                    const userData = userDoc.data();
+                    setUser({
+                        id: userDoc.id,
+                        // Admin uses 'username', regular user uses 'fullName'
+                        fullName: userData.username || userData.fullName, 
+                        email: userData.email,
+                        phone: userData.phone || '' 
+                    });
+                } else {
+                    setUser(null);
+                }
+
             } catch (error) {
-                console.error("Error fetching admin profile:", error);
+                console.error("Error fetching user profile:", error);
+                setUser(null);
+            } finally {
+                setLoading(false);
             }
         };
 
-        const loggedInUserEmail = localStorage.getItem('userEmail');
-        if (loggedInUserEmail) {
-            // The regular user profile is fetched by the hook, so we only need to fetch admin here
-            fetchAdminProfile(loggedInUserEmail);
-        }
-
+        fetchUser();
     }, []);
-
-    // The component is loading if the user profile hook is still loading
-    useEffect(() => {
-        setLoading(userLoading);
-    }, [userLoading]);
-
 
     const handleLogout = () => {
         localStorage.removeItem('userEmail');
         router.push('/');
     }
     
-    // The final user object is either the regular user or the admin user
-    const user = regularUser || adminUser;
-
     if (loading) {
         return <div className="flex items-center gap-2">
             <Skeleton className="h-8 w-40" />
