@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { Badge } from "@/components/ui/badge";
@@ -17,8 +18,11 @@ import {
   ArrowDownUp,
   AlertTriangle,
   RefreshCw,
-  Clock
+  Clock,
+  BrainCircuit
 } from "lucide-react";
+import { predictCrowding, PredictCrowdingOutput } from '@/ai/flows/predict-crowding';
+import { sectors } from '@/lib/data';
 
 // Map API alert levels to proper crowd monitoring alert types
 const alertLevelMapping = {
@@ -46,6 +50,14 @@ const alertLevelMapping = {
     color: "bg-blue-900/20 border-blue-500",
     badgeClass: "bg-blue-500",
   },
+  predicted: {
+    type: "Predicted Crowding",
+    priority: "Medium",
+    icon: BrainCircuit,
+    variant: "default" as const,
+    color: "bg-purple-900/20 border-purple-500",
+    badgeClass: "bg-purple-500",
+  }
 };
 
 // Map API feed areas to sector names for consistency with your UI
@@ -71,6 +83,17 @@ interface ApiAlert {
   timestamp: string;
 }
 
+interface PredictedAlert {
+  feed_id: string;
+  feed_name: string;
+  alert_level: 'predicted';
+  current_count: number;
+  recommendations: string;
+  timestamp: string;
+}
+
+type CombinedAlert = ApiAlert | PredictedAlert;
+
 interface AlertsResponse {
   alerts: ApiAlert[];
   count: number;
@@ -78,33 +101,58 @@ interface AlertsResponse {
 }
 
 export default function AlertsPage() {
-  const [alerts, setAlerts] = useState<ApiAlert[]>([]);
+  const [alerts, setAlerts] = useState<CombinedAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [sortBy, setSortBy] = useState<'timestamp' | 'priority' | 'count'>('timestamp');
-  const [filterLevel, setFilterLevel] = useState<'all' | 'critical' | 'warning'>('all');
+  const [filterLevel, setFilterLevel] = useState<'all' | 'critical' | 'warning' | 'predicted'>('all');
   const intervalRef = useRef<NodeJS.Timeout>();
 
 
-  const fetchAlerts = async () => {
+  const fetchAlertsAndPredictions = async () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Fetch real-time alerts
       const response = await fetch('http://localhost:5000/api/alerts');
-      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
       const data: AlertsResponse = await response.json();
-      setAlerts(data.alerts);
+      
+      // Run prediction flow
+      const predictionInput = {
+        sectorData: sectors.map(s => ({
+          sectorId: s.name,
+          currentCount: data.alerts.find(a => a.feed_name.includes(s.name))?.current_count ?? 0,
+          capacity: 100, // Placeholder
+          historicalData: [50, 60, 70, 80], // Placeholder
+        })),
+        eventDetails: "Large music festival, expecting peak attendance in the evening."
+      };
+      
+      const predictions: PredictCrowdingOutput = await predictCrowding(predictionInput);
+
+      const predictedAlerts: PredictedAlert[] = predictions
+        .filter(p => p.riskLevel === 'high')
+        .map(p => ({
+            feed_id: `pred_${p.sectorId.replace(' ', '_')}`,
+            feed_name: p.sectorId,
+            alert_level: 'predicted',
+            current_count: p.predictedCrowd,
+            recommendations: p.recommendations,
+            timestamp: new Date().toISOString()
+        }));
+
+      setAlerts([...data.alerts, ...predictedAlerts]);
       setLastUpdated(data.timestamp);
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch alerts';
       setError(errorMessage);
       console.error('Error fetching alerts:', err);
-      // Stop polling on error
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
@@ -114,12 +162,11 @@ export default function AlertsPage() {
   };
 
   const startPolling = () => {
-    // Clear any existing interval before starting a new one
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
-    fetchAlerts();
-    intervalRef.current = setInterval(fetchAlerts, 10000);
+    fetchAlertsAndPredictions();
+    intervalRef.current = setInterval(fetchAlertsAndPredictions, 15000); // Poll every 15s
   };
 
   useEffect(() => {
@@ -145,18 +192,16 @@ export default function AlertsPage() {
   const getSortedAndFilteredAlerts = () => {
     let filtered = alerts;
     
-    // Filter by alert level
     if (filterLevel !== 'all') {
       filtered = alerts.filter(alert => alert.alert_level === filterLevel);
     }
     
-    // Sort alerts
     return filtered.sort((a, b) => {
       switch (sortBy) {
         case 'timestamp':
           return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
         case 'priority':
-          const priorityOrder = { critical: 3, warning: 2, normal: 1 };
+          const priorityOrder = { critical: 4, predicted: 3, warning: 2, normal: 1 };
           return priorityOrder[b.alert_level] - priorityOrder[a.alert_level];
         case 'count':
           return b.current_count - a.current_count;
@@ -170,6 +215,13 @@ export default function AlertsPage() {
     setLoading(true);
     startPolling();
   };
+
+  const handleFilterChange = () => {
+    const levels: ('all' | 'critical' | 'warning' | 'predicted')[] = ['all', 'critical', 'warning', 'predicted'];
+    const currentIndex = levels.indexOf(filterLevel);
+    const nextIndex = (currentIndex + 1) % levels.length;
+    setFilterLevel(levels[nextIndex]);
+  }
 
   if (loading && alerts.length === 0) {
     return (
@@ -225,10 +277,10 @@ export default function AlertsPage() {
         <div className="flex items-center gap-2">
           <Button 
             variant="outline" 
-            onClick={() => setFilterLevel(filterLevel === 'all' ? 'critical' : filterLevel === 'critical' ? 'warning' : 'all')}
+            onClick={handleFilterChange}
           >
             <Filter className="mr-2 h-4 w-4" />
-            Filter: {filterLevel === 'all' ? 'All' : filterLevel === 'critical' ? 'Critical' : 'Warning'}
+            Filter: {filterLevel.charAt(0).toUpperCase() + filterLevel.slice(1)}
           </Button>
           <Button 
             variant="outline"
@@ -275,9 +327,7 @@ export default function AlertsPage() {
                     <div
                       className={cn(
                         "p-2 rounded-full",
-                        alert.alert_level === "critical" && "bg-destructive",
-                        alert.alert_level === "warning" && "bg-yellow-500",
-                        alert.alert_level === "normal" && "bg-blue-500"
+                        details.badgeClass
                       )}
                     >
                       <Icon className="h-6 w-6 text-white" />
@@ -286,24 +336,32 @@ export default function AlertsPage() {
                       <p className="font-bold text-lg">
                         {details.type} - {alert.feed_name}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        Density: {alert.density_percentage}%
-                      </p>
+                       {'density_percentage' in alert && (
+                        <p className="text-sm text-muted-foreground">
+                          Density: {alert.density_percentage}%
+                        </p>
+                      )}
+                      {'recommendations' in alert && (
+                         <p className="text-sm text-muted-foreground">
+                          {alert.recommendations}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="text-sm text-muted-foreground">
                     {formatTimestamp(alert.timestamp)}
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1 items-start md:items-end">
                     <Badge
-                      variant={details.variant}
                       className={cn(details.badgeClass)}
                     >
                       {alert.alert_level.toUpperCase()}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {alert.feed_id}
-                    </span>
+                     {'current_count' in alert && (
+                        <span className="text-xs text-muted-foreground">
+                            {alert.alert_level === 'predicted' ? 'Predicted' : 'Current'} Count: {alert.current_count}
+                        </span>
+                     )}
                   </div>
                 </CardContent>
               </Card>
@@ -317,9 +375,11 @@ export default function AlertsPage() {
           Showing {sortedAndFilteredAlerts.length} of {alerts.length} alerts
         </p>
         <p className="text-xs text-muted-foreground">
-          Auto-refresh every 10 seconds
+          Auto-refresh every 15 seconds
         </p>
       </div>
     </div>
   );
 }
+
+    
