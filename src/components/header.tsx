@@ -10,9 +10,16 @@ import { ThemeToggle } from "./theme-toggle";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Skeleton } from "./ui/skeleton";
+import { useRouter } from "next/navigation";
 
 function UserProfileDisplay() {
     const { user, loading } = useUserProfile();
+    const router = useRouter();
+
+    const handleLogout = () => {
+        localStorage.removeItem('userEmail');
+        router.push('/');
+    }
 
     if (loading) {
         return <div className="flex items-center gap-2">
@@ -23,7 +30,7 @@ function UserProfileDisplay() {
 
     if (!user) {
         return <Button variant="outline" size="sm" asChild>
-            <Link href="/">
+            <Link href="/login">
               <LogOut className="mr-2 h-4 w-4" />
               Log In
             </Link>
@@ -46,6 +53,9 @@ function UserProfileDisplay() {
                     {getInitials(user.fullName)}
                 </AvatarFallback>
             </Avatar>
+            <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Log out">
+                <LogOut className="h-5 w-5" />
+            </Button>
         </div>
     )
 
