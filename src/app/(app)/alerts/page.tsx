@@ -21,8 +21,6 @@ import {
   Clock,
   BrainCircuit
 } from "lucide-react";
-import { predictCrowding, PredictCrowdingOutput } from '@/ai/flows/predict-crowding';
-import { sectors } from '@/lib/data';
 
 // Map API alert levels to proper crowd monitoring alert types
 const alertLevelMapping = {
@@ -83,6 +81,13 @@ interface ApiAlert {
   timestamp: string;
 }
 
+interface Prediction {
+    sectorId: string;
+    predictedCrowd: number;
+    riskLevel: 'low' | 'medium' | 'high';
+    recommendations: string;
+}
+
 interface PredictedAlert {
   feed_id: string;
   feed_name: string;
@@ -98,6 +103,10 @@ interface AlertsResponse {
   alerts: ApiAlert[];
   count: number;
   timestamp: string;
+}
+
+interface PredictionsResponse {
+  predictions: Prediction[];
 }
 
 export default function AlertsPage() {
@@ -116,26 +125,20 @@ export default function AlertsPage() {
       setError(null);
 
       // Fetch real-time alerts
-      const response = await fetch('http://localhost:5000/api/alerts');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      const alertsResponse = await fetch('http://localhost:5000/api/alerts');
+      if (!alertsResponse.ok) {
+        throw new Error(`HTTP error! status: ${alertsResponse.status}`);
       }
-      const data: AlertsResponse = await response.json();
+      const alertsData: AlertsResponse = await alertsResponse.json();
       
-      // Run prediction flow
-      const predictionInput = {
-        sectorData: sectors.map(s => ({
-          sectorId: s.name,
-          currentCount: data.alerts.find(a => a.feed_name.includes(s.name))?.current_count ?? 0,
-          capacity: 100, // Placeholder
-          historicalData: [50, 60, 70, 80], // Placeholder
-        })),
-        eventDetails: "Large music festival, expecting peak attendance in the evening."
-      };
+      // Fetch predictions
+      const predictionsResponse = await fetch('http://localhost:5000/api/predictions');
+       if (!predictionsResponse.ok) {
+        throw new Error(`HTTP error! status: ${predictionsResponse.status}`);
+      }
+      const predictionsData: PredictionsResponse = await predictionsResponse.json();
       
-      const predictions: PredictCrowdingOutput = await predictCrowding(predictionInput);
-
-      const predictedAlerts: PredictedAlert[] = predictions
+      const predictedAlerts: PredictedAlert[] = predictionsData.predictions
         .filter(p => p.riskLevel === 'high')
         .map(p => ({
             feed_id: `pred_${p.sectorId.replace(' ', '_')}`,
@@ -146,8 +149,8 @@ export default function AlertsPage() {
             timestamp: new Date().toISOString()
         }));
 
-      setAlerts([...data.alerts, ...predictedAlerts]);
-      setLastUpdated(data.timestamp);
+      setAlerts([...alertsData.alerts, ...predictedAlerts]);
+      setLastUpdated(alertsData.timestamp);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch alerts';
@@ -381,5 +384,3 @@ export default function AlertsPage() {
     </div>
   );
 }
-
-    
