@@ -34,6 +34,8 @@ import {
   Search,
   MessageSquareWarning,
   AlertOctagon,
+  FileText,
+  RefreshCw
 } from "lucide-react";
 import { collection, onSnapshot, doc, addDoc, updateDoc, query, where } from "firebase/firestore";
 import { useEffect, useState, useRef } from "react";
@@ -57,6 +59,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import type { Grievance } from "@/app/(app)/grievances/page";
+import { summarizeDashboard } from "@/ai/flows/summarize-dashboard";
 
 
 const metricIcons: { [key: string]: React.ElementType } = {
@@ -171,15 +174,21 @@ export default function DashboardPage() {
   const [metrics, setMetrics] = useState(keyMetrics);
   const [isAddGuardOpen, setAddGuardOpen] = useState(false);
   const { toast } = useToast();
-  const [grievanceCounts, setGrievanceCounts] = useState({
-    total: 0,
-    medical: 0,
-    missing: 0,
-    general: 0,
-  });
+  const [openGrievances, setOpenGrievances] = useState<Grievance[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [summary, setSummary] = useState('');
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
 
   const alertsIntervalRef = useRef<NodeJS.Timeout>();
 
+  const grievanceCounts = openGrievances.reduce((acc, g) => {
+      acc.total++;
+      if (g.type === 'Medical Attention') acc.medical++;
+      else if (g.type === 'Missing Person') acc.missing++;
+      else if (g.type === 'General Grievance') acc.general++;
+      return acc;
+  }, { total: 0, medical: 0, missing: 0, general: 0 });
 
   useEffect(() => {
     // Fetch guards data
@@ -242,27 +251,28 @@ export default function DashboardPage() {
           const data = await response.json();
           const activeAlerts = data.alerts.filter(
             (alert: { alert_level: string; }) => alert.alert_level === 'warning' || alert.alert_level === 'critical'
-          ).length;
+          );
+          setAlerts(activeAlerts);
 
           setMetrics(prevMetrics => {
             const activeAlertsMetric = prevMetrics["Active Alerts"];
             if (!activeAlertsMetric) return prevMetrics;
 
             const currentAlerts = parseInt(activeAlertsMetric.value) || 0;
-            const changeType = activeAlerts > currentAlerts ? 'increase' : activeAlerts < currentAlerts ? 'decrease' : 'neutral';
+            const newCount = activeAlerts.length;
+            const changeType = newCount > currentAlerts ? 'increase' : newCount < currentAlerts ? 'decrease' : 'neutral';
 
             return {
               ...prevMetrics,
               "Active Alerts": {
                 ...activeAlertsMetric,
-                value: activeAlerts.toString(),
-                change: `${changeType === 'increase' ? '+' : ''}${activeAlerts - currentAlerts}`,
+                value: newCount.toString(),
+                change: `${changeType === 'increase' ? '+' : ''}${newCount - currentAlerts}`,
                 changeType: changeType,
               },
             };
           });
         } else {
-            // If response is not OK, but it's not a network error, stop polling.
             if (alertsIntervalRef.current) {
               clearInterval(alertsIntervalRef.current);
             }
@@ -274,7 +284,6 @@ export default function DashboardPage() {
         }
       } catch (error) {
         console.error("Failed to fetch active alerts:", error);
-        // If the fetch fails, stop the polling to prevent console errors.
         if (alertsIntervalRef.current) {
           clearInterval(alertsIntervalRef.current);
         }
@@ -287,20 +296,12 @@ export default function DashboardPage() {
     };
     
     fetchAlerts();
-    alertsIntervalRef.current = setInterval(fetchAlerts, 10000); // Poll every 10 seconds
+    alertsIntervalRef.current = setInterval(fetchAlerts, 10000);
 
-     // Fetch open grievances data
     const grievancesQuery = query(collection(db, "grievances"), where("status", "==", "new"));
     const grievancesUnsubscribe = onSnapshot(grievancesQuery, (snapshot) => {
-      const counts = { total: 0, medical: 0, missing: 0, general: 0 };
-      snapshot.forEach(doc => {
-        const grievance = doc.data() as Grievance;
-        counts.total++;
-        if (grievance.type === 'Medical Attention') counts.medical++;
-        else if (grievance.type === 'Missing Person') counts.missing++;
-        else if (grievance.type === 'General Grievance') counts.general++;
-      });
-      setGrievanceCounts(counts);
+      const grievancesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grievance));
+      setOpenGrievances(grievancesData);
     });
 
     return () => {
@@ -312,6 +313,7 @@ export default function DashboardPage() {
       grievancesUnsubscribe();
     };
   }, [toast]);
+  
 
   const handleGuardUpdate = async (guardId: string, field: keyof Guard, value: string) => {
     const guardRef = doc(db, "guards", guardId);
@@ -330,10 +332,39 @@ export default function DashboardPage() {
       });
     }
   };
+  
+  const handleGenerateSummary = async () => {
+    setIsSummaryLoading(true);
+    try {
+      const result = await summarizeDashboard({
+        guards,
+        alerts,
+        grievances: openGrievances
+      });
+      setSummary(result.summary);
+      setIsSummaryDialogOpen(true);
+    } catch (error) {
+       console.error("Error generating summary:", error);
+       toast({
+         title: "Error",
+         description: "Could not generate the summary. Please try again.",
+         variant: "destructive",
+       });
+    } finally {
+        setIsSummaryLoading(false);
+    }
+  }
 
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+        <Button onClick={handleGenerateSummary} disabled={isSummaryLoading}>
+          {isSummaryLoading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+          Generate Summary
+        </Button>
+      </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Object.entries(metrics).map(([title, data]) => {
           const Icon = metricIcons[title];
@@ -478,6 +509,22 @@ export default function DashboardPage() {
           </Table>
         </CardContent>
       </Card>
+      <Dialog open={isSummaryDialogOpen} onOpenChange={setIsSummaryDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+            <DialogTitle>Live Event Summary</DialogTitle>
+            <DialogDescription>
+                An AI-generated summary of the current event status.
+            </DialogDescription>
+            </DialogHeader>
+            <div className="prose prose-sm dark:prose-invert whitespace-pre-wrap">
+                {summary}
+            </div>
+            <DialogFooter>
+            <Button onClick={() => setIsSummaryDialogOpen(false)}>Close</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
