@@ -17,7 +17,8 @@ interface GrievanceData {
 
 export const createGrievance = async (data: GrievanceData) => {
     let photoDataUri = null;
-
+    const grievancePayload: Omit<GrievanceData, 'photoFile'> & { photoDataUri?: string | null } = { ...data };
+    
     if (data.photoFile) {
         try {
             // Convert file to buffer and then to data URL on the server
@@ -32,8 +33,9 @@ export const createGrievance = async (data: GrievanceData) => {
         }
     }
     
-    // Destructure to remove photoFile and keep the rest of the payload
-    const { photoFile, ...grievancePayload } = data;
+    // Remove photoFile from the payload to avoid Firestore error
+    delete (grievancePayload as Partial<GrievanceData>).photoFile;
+
 
     try {
         const docRef = await addDoc(collection(db, 'grievances'), {
