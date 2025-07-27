@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +25,7 @@ import {
 import { useEffect, useState, useRef, useCallback } from "react";
 
 // Backend configuration
-const BACKEND_URL = "http://127.0.0.1:5000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const FEED_IDS = ["feed_1", "feed_2", "feed_3", "feed_4", "feed_5"];
 
 interface FeedData {
@@ -262,6 +263,11 @@ export default function LiveFeedPage() {
 
   // Fetch feeds data with improved error handling
   const fetchFeedsData = async () => {
+    if (!BACKEND_URL) {
+        setError("Backend URL is not configured. Please set NEXT_PUBLIC_API_BASE_URL.");
+        setIsLoading(false);
+        return;
+    }
     try {
       const response = await fetch(`${BACKEND_URL}/api/feeds`, {
         method: 'GET',
