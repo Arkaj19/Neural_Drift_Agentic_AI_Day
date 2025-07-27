@@ -25,6 +25,15 @@ interface HeatmapDataItem {
   id?: string;
 }
 
+interface PointOfInterest {
+    name: string;
+    icon: string; // SVG content for the marker
+    location: {
+        lat: number;
+        lng: number;
+    };
+}
+
 const containerStyle: React.CSSProperties = {
   width: '100%',
   height: '75vh', // Adjusted for better viewing
@@ -89,15 +98,18 @@ const defaultCenter: [number, number] = [77.2092, 28.6141]; // lng, lat format
 
 const MapLegend = () => (
     <div style={legendStyle}>
-        <div style={{fontWeight: 'bold', marginBottom: '5px'}}>Population Density</div>
+        <div style={{fontWeight: 'bold', marginBottom: '5px'}}>Legend</div>
         <div style={legendItemStyle}>
-            <span style={colorBoxStyle('#ef4444')}></span> High Density
+            <span style={colorBoxStyle('#ef4444')}></span> High Density Crowd
         </div>
         <div style={legendItemStyle}>
-            <span style={colorBoxStyle('#f59e0b')}></span> Medium Density
+            <span style={colorBoxStyle('#f59e0b')}></span> Medium Density Crowd
         </div>
         <div style={legendItemStyle}>
-            <span style={colorBoxStyle('#22c55e')}></span> Normal Density
+            <span style={colorBoxStyle('#22c55e')}></span> Normal Density Crowd
+        </div>
+         <div style={legendItemStyle}>
+            <div style={{...colorBoxStyle('blue'), display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px'}}>i</div> Points of Interest
         </div>
     </div>
 );
@@ -126,6 +138,20 @@ const MapViewPage: React.FC = () => {
       default:
         return '#22c55e'; // green-500
     }
+  };
+
+  // Function to generate POIs based on the first heatmap location
+  const generatePOIs = (baseLocation: Location): PointOfInterest[] => {
+        const baseLat = parseFloat(baseLocation.lat.toString());
+        const baseLng = parseFloat(baseLocation.lng.toString());
+
+        return [
+            { name: 'Washroom', icon: '🚻', location: { lat: baseLat + 0.001, lng: baseLng + 0.001 } },
+            { name: 'Cloak Room', icon: '🧥', location: { lat: baseLat - 0.001, lng: baseLng - 0.001 } },
+            { name: 'Smoking Zone', icon: '🚬', location: { lat: baseLat + 0.001, lng: baseLng - 0.001 } },
+            { name: 'Hydration Area', icon: '💧', location: { lat: baseLat - 0.001, lng: baseLng + 0.001 } },
+            { name: 'Lost and Found', icon: '❓', location: { lat: baseLat, lng: baseLng + 0.0015 } },
+        ];
   };
 
   const fetchFromAPI = async (): Promise<void> => {
@@ -162,14 +188,40 @@ const MapViewPage: React.FC = () => {
     }
   };
 
+  const addPOIMarkers = (pois: PointOfInterest[]) => {
+      if (!map.current) return;
+      pois.forEach(poi => {
+            const el = document.createElement('div');
+            el.innerHTML = poi.icon;
+            el.style.width = '30px';
+            el.style.height = '30px';
+            el.style.fontSize = '20px';
+            el.style.display = 'flex';
+            el.style.justifyContent = 'center';
+            el.style.alignItems = 'center';
+            el.style.backgroundColor = '#3b82f6'; // blue-500
+            el.style.color = 'white';
+            el.style.borderRadius = '50%';
+            el.style.border = '2px solid white';
+            el.className = 'poi-marker';
+
+            const popup = new maptilersdk.Popup({ offset: 25 }).setText(poi.name);
+
+            new maptilersdk.Marker({element: el})
+                .setLngLat([poi.location.lng, poi.location.lat])
+                .setPopup(popup)
+                .addTo(map.current!);
+        });
+  }
+
   const processMapData = async (data: HeatmapDataItem[]): Promise<void> => {
     setLocations(data);
     if (map.current && data.length > 0) {
       // Clear existing markers by removing their DOM elements
-      const existingMarkers = document.querySelectorAll('.custom-marker');
+      const existingMarkers = document.querySelectorAll('.custom-marker, .poi-marker');
       existingMarkers.forEach(marker => marker.remove());
 
-      // Add new markers
+      // Add new crowd markers
       data.forEach((item, index) => {
         const el = document.createElement('div');
         el.className = 'custom-marker';
@@ -189,6 +241,10 @@ const MapViewPage: React.FC = () => {
           .setPopup(popup)
           .addTo(map.current!);
       });
+
+      // Generate and add POI markers
+      const pois = generatePOIs(data[0].location);
+      addPOIMarkers(pois);
 
       const center = calculateCenter(data);
       map.current.flyTo({ center: center, zoom: 15 });
@@ -261,7 +317,7 @@ const MapViewPage: React.FC = () => {
       <div ref={mapContainer} className="absolute w-full h-full" />
       {loading && (
         <div style={statusStyle}>
-          Fetching heatmap data...
+          Fetching map data...
         </div>
       )}
       <MapLegend />
@@ -270,3 +326,5 @@ const MapViewPage: React.FC = () => {
 };
 
 export default MapViewPage;
+
+    
