@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Shield, LogIn } from 'lucide-react';
+import { Shield, LogIn, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -174,7 +174,12 @@ export default function LoginPage() {
               </div>
 
               <Button type="submit" className="w-full text-lg font-semibold" size="lg" disabled={loading}>
-                {loading ? 'Logging in...' : (
+                {loading ? (
+                    <>
+                        <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                        Logging In...
+                    </>
+                ) : (
                   <>
                     <LogIn className="mr-2 h-5 w-5" />
                     Login

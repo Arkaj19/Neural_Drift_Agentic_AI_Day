@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -117,7 +117,12 @@ export default function SignUpPage() {
                 />
               </div>
               <Button type="submit" className="w-full text-lg font-semibold" size="lg" disabled={loading}>
-                {loading ? 'Signing Up...' : (
+                {loading ? (
+                    <>
+                        <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                        Signing Up...
+                    </>
+                ) : (
                   <>
                     <UserPlus className="mr-2 h-5 w-5" />
                     Sign Up
