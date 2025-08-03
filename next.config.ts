@@ -49,19 +49,18 @@ const nextConfig: NextConfig = {
     unoptimized: true, // For video streams
   },
   async rewrites() {
+    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:5000';
     return [
-      // Optional: Proxy video streams through Next.js to avoid CORS issues
       {
-        source: '/api/video/:path*',
-        destination: 'http://localhost:5000/api/video/:path*', // Replace with your backend URL
-        // destination: `${process.env.NEXT_PUBLIC_API_BASE_URL}/video/:path*`
+        source: '/api/:path*',
+        destination: `${backendUrl}/api/:path*`,
       },
     ];
   },
   async headers() {
     return [
       {
-        source: '/api/video/:path*',
+        source: '/api/:path*',
         headers: [
           {
             key: 'Cache-Control',

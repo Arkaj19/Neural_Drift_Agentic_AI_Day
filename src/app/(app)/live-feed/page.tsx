@@ -25,8 +25,6 @@ import {
 import { useEffect, useState, useRef, useCallback } from "react";
 
 // Backend configuration
-const BACKEND_URL = 'http://localhost:5000';
-// const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const FEED_IDS = ["feed_1", "feed_2", "feed_3", "feed_4", "feed_5"];
 
 interface FeedData {
@@ -69,7 +67,7 @@ const RobustVideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onErr
   // Generate unique stream URL to prevent caching
   const generateStreamUrl = useCallback(() => {
     const timestamp = Date.now();
-    return `${BACKEND_URL}/api/video/stream/${feedId}?t=${timestamp}`;
+    return `/api/video/stream/${feedId}?t=${timestamp}`;
   }, [feedId]);
 
   // Handle successful image load
@@ -264,13 +262,8 @@ export default function LiveFeedPage() {
 
   // Fetch feeds data with improved error handling
   const fetchFeedsData = async () => {
-    if (!BACKEND_URL) {
-        setError("Backend URL is not configured. Please set NEXT_PUBLIC_API_BASE_URL.");
-        setIsLoading(false);
-        return;
-    }
     try {
-      const response = await fetch(`${BACKEND_URL}/api/feeds`, {
+      const response = await fetch(`/api/feeds`, {
         method: 'GET',
         headers: {
           'Cache-Control': 'no-cache',
