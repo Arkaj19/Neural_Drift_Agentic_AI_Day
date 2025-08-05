@@ -26,6 +26,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 
 // Backend configuration
 const FEED_IDS = ["feed_1", "feed_2", "feed_3", "feed_4", "feed_5"];
+const BACKEND_URL = "http://127.0.0.1:5000";
 
 interface FeedData {
   name: string;
@@ -67,7 +68,7 @@ const RobustVideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onErr
   // Generate unique stream URL to prevent caching
   const generateStreamUrl = useCallback(() => {
     const timestamp = Date.now();
-    return `/api/video/stream/${feedId}?t=${timestamp}`;
+    return `${BACKEND_URL}/api/video/stream/${feedId}?t=${timestamp}`;
   }, [feedId]);
 
   // Handle successful image load
@@ -263,7 +264,7 @@ export default function LiveFeedPage() {
   // Fetch feeds data with improved error handling
   const fetchFeedsData = async () => {
     try {
-      const response = await fetch(`/api/feeds`, {
+      const response = await fetch(`${BACKEND_URL}/api/feeds`, {
         method: 'GET',
         headers: {
           'Cache-Control': 'no-cache',

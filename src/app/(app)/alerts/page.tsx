@@ -125,14 +125,14 @@ export default function AlertsPage() {
       setError(null);
 
       // Fetch real-time alerts
-      const alertsResponse = await fetch('/api/alerts');
+      const alertsResponse = await fetch('http://127.0.0.1:5000/api/alerts');
       if (!alertsResponse.ok) {
         throw new Error(`HTTP error! status: ${alertsResponse.status}`);
       }
       const alertsData: AlertsResponse = await alertsResponse.json();
       
       // Fetch predictions
-      const predictionsResponse = await fetch('/api/predictions');
+      const predictionsResponse = await fetch('http://127.0.0.1:5000/api/predictions');
        if (!predictionsResponse.ok) {
         throw new Error(`HTTP error! status: ${predictionsResponse.status}`);
       }

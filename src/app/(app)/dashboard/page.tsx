@@ -219,7 +219,7 @@ export default function DashboardPage() {
     // Fetch active alerts data
     const fetchAlerts = async () => {
       try {
-        const response = await fetch('/api/alerts');
+        const response = await fetch('http://127.0.0.1:5000/api/alerts');
         if (response.ok) {
           const data = await response.json();
           const activeAlerts = data.alerts.filter(
