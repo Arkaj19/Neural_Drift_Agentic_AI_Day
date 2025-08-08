@@ -168,6 +168,23 @@ function AddGuardForm({ onGuardAdded }: { onGuardAdded: () => void }) {
   );
 }
 
+const AnimatedCounter = ({ value }: { value: number }) => {
+  const [start, setStart] = useState(0);
+
+  useEffect(() => {
+    setStart(value);
+  }, [value]);
+
+  return (
+      <div
+          className="text-2xl font-bold animate-count-up"
+          style={{ '--num-start': 0, '--num-end': value } as React.CSSProperties}
+      >
+      </div>
+  );
+};
+
+
 export default function DashboardPage() {
   const [guards, setGuards] = useState<Guard[]>([]);
   const [metrics, setMetrics] = useState(keyMetrics);
@@ -219,9 +236,7 @@ export default function DashboardPage() {
     // Fetch active alerts data
     const fetchAlerts = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/alerts');
-        // const response = await fetch('http://34.122.108.119:8000/api/alerts');
-        // const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/alerts`);
+        const response = await fetch('http://127.0.0.1:5000/api/alerts');
         if (response.ok) {
           const data = await response.json();
           const activeAlerts = data.alerts.filter(
@@ -350,7 +365,7 @@ export default function DashboardPage() {
                 <Icon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{data.value}</div>
+                <AnimatedCounter value={parseInt(data.value)} />
                 <p
                   className={cn(
                     "text-xs text-muted-foreground flex items-center",
@@ -377,7 +392,7 @@ export default function DashboardPage() {
                 <AlertOctagon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">{grievanceCounts.total}</div>
+                <AnimatedCounter value={grievanceCounts.total} />
                 <div className="text-xs text-muted-foreground grid grid-cols-3 gap-2 mt-2">
                     <div className="flex items-center gap-1">
                         <Stethoscope className="h-3 w-3" />

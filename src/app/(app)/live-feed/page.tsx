@@ -25,9 +25,7 @@ import {
 import { useEffect, useState, useRef, useCallback } from "react";
 
 // Backend configuration
-const BACKEND_URL = 'http://localhost:5000';
-// const BACKEND_URL = 'http://34.122.108.119:8000';
-// const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+const BACKEND_URL = 'http://127.0.0.1:5000';
 const FEED_IDS = ["feed_1", "feed_2", "feed_3", "feed_4", "feed_5"];
 
 interface FeedData {
@@ -188,7 +186,7 @@ const RobustVideoStream: React.FC<VideoStreamProps> = ({ feedId, feedData, onErr
       {/* Connection status indicator */}
       <div className="absolute top-2 right-2 z-20">
         {isConnected ? (
-          <div className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded text-xs">
+          <div className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded text-xs animate-pulse shadow-lg shadow-green-500/50">
             <Wifi className="h-3 w-3" />
             <span>LIVE</span>
           </div>
@@ -233,11 +231,11 @@ const getStatusBadgeVariant = (status: "normal" | "warning" | "critical") => {
 const getStatusColor = (status: "normal" | "warning" | "critical") => {
   switch (status) {
     case "critical":
-      return "border-red-500";
+      return "border-red-500 shadow-red-500/20";
     case "warning":
-      return "border-yellow-500";
+      return "border-yellow-500 shadow-yellow-500/20";
     case "normal":
-      return "border-green-500";
+      return "border-green-500/50";
     default:
       return "border-gray-500";
   }
@@ -367,7 +365,7 @@ export default function LiveFeedPage() {
             </p>
             <div className={cn(
               "flex items-center gap-1 text-xs px-2 py-1 rounded",
-              connectionStatus === 'online' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+              connectionStatus === 'online' ? "bg-green-800/50 text-green-300" : "bg-red-800/50 text-red-300"
             )}>
               {connectionStatus === 'online' ? (
                 <>
@@ -408,7 +406,7 @@ export default function LiveFeedPage() {
             <Card 
               key={feedId}
               className={cn(
-                "flex flex-col min-h-[450px]", 
+                "flex flex-col min-h-[450px] transition-shadow duration-300 hover:shadow-2xl", 
                 isOnline ? getStatusColor(feedData.alert_level) : "border-gray-400", 
                 "border-2"
               )}

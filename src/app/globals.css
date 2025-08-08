@@ -32,11 +32,11 @@
     --radius: 1rem;
   }
   .dark {
-    --background: 215 39% 12%; /* Dark grayish blue */
+    --background: 224 71% 4%; /* Deeper navy blue */
     --foreground: 210 40% 98%;
-    --card: 216 34% 17%;
+    --card: 224 71% 8%; /* Slightly lighter navy */
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 224 71% 4%;
     --popover-foreground: 210 40% 98%;
     --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 210 40% 98%;
@@ -44,11 +44,11 @@
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 195 91% 51%;
+    --accent: 195 91% 51%; /* Brighter cyan for accents */
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
+    --border: 217.2 32.6% 22.5%; /* Slightly more visible border */
     --input: 217.2 32.6% 17.5%;
     --ring: 217.2 91.2% 59.8%;
     --chart-1: 220 70% 50%;
@@ -66,4 +66,21 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@layer utilities {
+    @keyframes count-up {
+        from {
+            --num: 0;
+        }
+    }
+    .animate-count-up {
+        animation: count-up 1s ease-out forwards;
+        counter-reset: num var(--num-start, 0);
+        property: --num;
+        transition: --num 1s ease-out;
+    }
+    .animate-count-up::after {
+        content: counter(num);
+    }
 }
