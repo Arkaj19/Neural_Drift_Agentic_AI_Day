@@ -125,14 +125,18 @@ export default function AlertsPage() {
       setError(null);
 
       // Fetch real-time alerts
-      const alertsResponse = await fetch('http://127.0.0.1:5000/api/alerts');
+      const alertsResponse = await fetch('http://localhost:5000/api/alerts');
+      // const alertsResponse = await fetch('http://34.122.108.119:8000/api/alerts');
+      // const alertsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/alerts`);
       if (!alertsResponse.ok) {
         throw new Error(`HTTP error! status: ${alertsResponse.status}`);
       }
       const alertsData: AlertsResponse = await alertsResponse.json();
       
       // Fetch predictions
-      const predictionsResponse = await fetch('http://127.0.0.1:5000/api/predictions');
+      const predictionsResponse = await fetch('http://localhost:5000/api/predictions')
+      // const predictionsResponse = await fetch('http://34.122.108.119:8000/api/predictions')
+      // const predictionsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/predictions`);
        if (!predictionsResponse.ok) {
         throw new Error(`HTTP error! status: ${predictionsResponse.status}`);
       }

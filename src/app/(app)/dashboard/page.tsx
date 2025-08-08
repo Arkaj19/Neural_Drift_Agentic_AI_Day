@@ -219,7 +219,9 @@ export default function DashboardPage() {
     // Fetch active alerts data
     const fetchAlerts = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:5000/api/alerts');
+        const response = await fetch('http://localhost:5000/api/alerts');
+        // const response = await fetch('http://34.122.108.119:8000/api/alerts');
+        // const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/alerts`);
         if (response.ok) {
           const data = await response.json();
           const activeAlerts = data.alerts.filter(
