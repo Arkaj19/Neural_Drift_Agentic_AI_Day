@@ -235,7 +235,7 @@ const MapViewPage: React.FC = () => {
         el.style.boxShadow = '0 0 5px rgba(0,0,0,0.5)';
         
         const popup = new maptilersdk.Popup({ offset: 25 }).setHTML(
-          `<h3>${item.name}</h3><p>Area: ${item.area}</p><p>Density: ${item.intensity}%</p><p>Count: ${item.count}</p><p>Alert: ${item.alert_level}</p>`
+          `<div style="color: black;"><h3>${item.name}</h3><p>Area: ${item.area}</p><p>Density: ${item.intensity}%</p><p>Count: ${item.count}</p><p>Alert: ${item.alert_level}</p></div>`
         );
 
         new maptilersdk.Marker({ element: el })
