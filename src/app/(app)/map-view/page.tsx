@@ -123,7 +123,7 @@ const MapViewPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const apiKey = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
 
-  const API_ENDPOINT = 'http://localhost:5000/api/heatmap';
+  const API_ENDPOINT = 'http://127.0.0.1:5000/api/heatmap';
   // const API_ENDPOINT = 'http://34.122.108.119:8000/api/heatmap';
   // const API_ENDPOINT = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/heatmap`;
 
@@ -207,7 +207,9 @@ const MapViewPage: React.FC = () => {
             el.style.border = '2px solid white';
             el.className = 'poi-marker';
 
-            const popup = new maptilersdk.Popup({ offset: 25 }).setText(poi.name);
+            const popup = new maptilersdk.Popup({ offset: 25 }).setHTML(
+              `<div style="color: black;">${poi.name}</div>`
+            );
 
             new maptilersdk.Marker({element: el})
                 .setLngLat([poi.location.lng, poi.location.lat])
