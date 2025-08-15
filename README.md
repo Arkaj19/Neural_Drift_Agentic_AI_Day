@@ -2,6 +2,11 @@
 
 **Drishti AI: Event Guardian** is an AI-powered situational awareness platform designed for proactive crowd safety management during large-scale events. It provides a real-time, intelligent command center for security teams to monitor, analyze, and respond to incidents, ensuring a safer environment for everyone.
 
+![Drishti AI](https://res.cloudinary.com/dams0r5uk/image/upload/v1753526208/Picture1_wlf2zp.jpg)
+
+
+SS of Admin Dashboard:
+
 ![Drishti AI Dashboard](https://res.cloudinary.com/dams0r5uk/image/upload/v1755239920/e0596e3ca77b7bdadbf4e6a58e4f4b4221dbe2807421542949fae856a4d157f8_z2rcvo.png)
 
 ---
