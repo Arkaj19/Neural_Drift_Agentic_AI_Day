@@ -168,23 +168,6 @@ function AddGuardForm({ onGuardAdded }: { onGuardAdded: () => void }) {
   );
 }
 
-const AnimatedCounter = ({ value }: { value: number }) => {
-  const [start, setStart] = useState(0);
-
-  useEffect(() => {
-    setStart(value);
-  }, [value]);
-
-  return (
-      <div
-          className="text-2xl font-bold animate-count-up"
-          style={{ '--num-start': 0, '--num-end': value } as React.CSSProperties}
-      >
-      </div>
-  );
-};
-
-
 export default function DashboardPage() {
   const [guards, setGuards] = useState<Guard[]>([]);
   const [metrics, setMetrics] = useState(keyMetrics);
@@ -212,7 +195,6 @@ export default function DashboardPage() {
       const guardsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Guard));
       setGuards(guardsData);
       
-      // Update active guards count in metrics
       setMetrics(prevMetrics => {
         const activeGuardsCount = guardsData.filter(g => g.status === 'Active').length;
         const currentActiveGuardsMetric = prevMetrics["Active Guards"];
@@ -365,7 +347,7 @@ export default function DashboardPage() {
                 <Icon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <AnimatedCounter value={parseInt(data.value)} />
+                <div className="text-2xl font-bold">{data.value}</div>
                 <p
                   className={cn(
                     "text-xs text-muted-foreground flex items-center",
@@ -392,7 +374,7 @@ export default function DashboardPage() {
                 <AlertOctagon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <AnimatedCounter value={grievanceCounts.total} />
+                <div className="text-2xl font-bold">{grievanceCounts.total}</div>
                 <div className="text-xs text-muted-foreground grid grid-cols-3 gap-2 mt-2">
                     <div className="flex items-center gap-1">
                         <Stethoscope className="h-3 w-3" />
@@ -517,3 +499,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+  
